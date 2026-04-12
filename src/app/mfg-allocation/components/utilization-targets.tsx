@@ -10,18 +10,41 @@ import { cn } from "@/lib/utils"
 // Parse "W1-May-2026" or "May-2026" into a sortable timestamp
 function parseDateRangeValue(v: string): number {
   if (!v) return 0
-  // Weekly: "W1-May-2026" → extract month-year, week number
   const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
   if (weekMatch) {
     const d = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
     return d.getTime() + (parseInt(weekMatch[1]) - 1) * 7 * 86400000
   }
-  // Monthly: "May-2026" → first of month
   const monthMatch = v.match(/(\w+)-(\d{4})/)
   if (monthMatch) {
     return new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`).getTime()
   }
   return 0
+}
+
+const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+const fmtFull = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+
+// Convert "W1-May-2026" → "Apr 28 – May 4, 2026" or "May-2026" → "May 1 – May 31, 2026"
+function formatDateRange(v: string): string | null {
+  if (!v) return null
+  const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
+  if (weekMatch) {
+    const weekNum = parseInt(weekMatch[1])
+    const monthStart = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
+    const start = new Date(monthStart)
+    start.setDate(start.getDate() + (weekNum - 1) * 7 - start.getDay()) // align to Sunday start
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return `${fmt(start)} – ${fmtFull(end)}`
+  }
+  const monthMatch = v.match(/(\w+)-(\d{4})/)
+  if (monthMatch) {
+    const start = new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`)
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0) // last day of month
+    return `${fmt(start)} – ${fmtFull(end)}`
+  }
+  return null
 }
 
 interface UtilTarget {
@@ -129,8 +152,13 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
                   status === "below" ? "bg-red-50" : status === "near" ? "bg-amber-50" : ""
                 )}>
                   <TableCell>
-                    <Input value={row.dateRangeValue} onChange={e => handleChange(idx, "dateRangeValue", e.target.value)}
-                      placeholder={rangeType === "Weekly" ? "W1-May-2026" : "May-2026"} className="h-8 text-sm" />
+                    <div className="space-y-0.5">
+                      <Input value={row.dateRangeValue} onChange={e => handleChange(idx, "dateRangeValue", e.target.value)}
+                        placeholder={rangeType === "Weekly" ? "W1-May-2026" : "May-2026"} className="h-8 text-sm" />
+                      {formatDateRange(row.dateRangeValue) && (
+                        <p className="text-[10px] text-gray-400 pl-1">{formatDateRange(row.dateRangeValue)}</p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Input value={row.siteName} onChange={e => handleChange(idx, "siteName", e.target.value)}
