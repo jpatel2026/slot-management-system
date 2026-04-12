@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// 3.1 Product
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  mfgType     String   // Fresh, Frozen, Fresh & Frozen
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   @default("system")
+  updatedBy   String   @default("system")
+
+  carePrograms CareProgram[]
+  gdlts        Gdlt[]
+  orderReservations OrderReservation[]
+}
+
+// 3.2 Care Program
+model CareProgram {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  therapyType String   // Commercial, Clinical
+  country     String?
+  productId   Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   @default("system")
+  updatedBy   String   @default("system")
+
+  product     Product  @relation(fields: [productId], references: [id])
+  ltmConfigs  LtmConfig[]
+}
+
+// 3.3 Account (Site)
+model Account {
+  id           Int      @id @default(autoincrement())
+  name         String
+  siteId       String   @unique
+  alias        String
+  siteType     String   // Treatment, Apheresis, Cryopreservation, Manufacturing, Infusion, Courier, Distribution Center
+  address      String
+  contactName  String
+  contactEmail String
+  contactPhone String
+  mfgType      String?  // Fresh, Frozen, Fresh & Frozen
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdBy    String   @default("system")
+  updatedBy    String   @default("system")
+
+  holidays              Holiday[]
+  gdlts                 Gdlt[]
+  ibps                  Ibp[]
+  mpss                  Mps[]
+  dailyCapacities       DailyCapacity[]
+
+  aphRelationships      SiteRelationship[] @relation("AphSite")
+  cryoRelationships     SiteRelationship[] @relation("CryoSite")
+  mfgRelationships      SiteRelationship[] @relation("MfgSite")
+  wdcRelationships      SiteRelationship[] @relation("WdcSite")
+  infusionRelationships SiteRelationship[] @relation("InfusionSite")
+
+  ltmAphSite       LtmConfig[] @relation("LtmAphSite")
+  ltmCryoSite      LtmConfig[] @relation("LtmCryoSite")
+  ltmMfgSite       LtmConfig[] @relation("LtmMfgSite")
+  ltmWdcSite       LtmConfig[] @relation("LtmWdcSite")
+  ltmInfusionSite  LtmConfig[] @relation("LtmInfusionSite")
+
+  orderAphSite      OrderReservation[] @relation("OrderAphSite")
+  orderCryoSite     OrderReservation[] @relation("OrderCryoSite")
+  orderMfgSite      OrderReservation[] @relation("OrderMfgSite")
+  orderWdcSite      OrderReservation[] @relation("OrderWdcSite")
+  orderInfusionSite OrderReservation[] @relation("OrderInfusionSite")
+}
+
+// 3.4 LTM Configuration
+model LtmConfig {
+  id                    Int      @id @default(autoincrement())
+  milestoneName         String
+  leg                   Int
+  careProgramId         Int
+  cryoTypes             String   // Comma-separated: "Central,Manufacturing,Local"
+  wdcApplicable         Boolean  @default(false)
+  active                Boolean  @default(true)
+  cryoLeadTime          Int?
+  localLeadTime         Int?
+  mfgLeadTime           Int?
+  aphSiteId             Int?
+  cryoSiteId            Int?
+  mfgSiteId             Int?
+  wdcSiteId             Int?
+  infusionSiteId        Int?
+  nonWorkingDay         String?
+  holidaySiteAssociation String?
+  updateLogicCentral    String?
+  centralApplicability  String?
+  updateLogicMfg        String?
+  mfgApplicability      String?
+  updateLogicLocal      String?
+  localApplicability    String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdBy             String   @default("system")
+  updatedBy             String   @default("system")
+
+  careProgram           CareProgram @relation(fields: [careProgramId], references: [id])
+  aphSite               Account?    @relation("LtmAphSite", fields: [aphSiteId], references: [id])
+  cryoSite              Account?    @relation("LtmCryoSite", fields: [cryoSiteId], references: [id])
+  mfgSite               Account?    @relation("LtmMfgSite", fields: [mfgSiteId], references: [id])
+  wdcSite               Account?    @relation("LtmWdcSite", fields: [wdcSiteId], references: [id])
+  infusionSite          Account?    @relation("LtmInfusionSite", fields: [infusionSiteId], references: [id])
+}
+
+// 3.5 Holiday
+model Holiday {
+  id        Int      @id @default(autoincrement())
+  name      String
+  date      DateTime
+  accountId Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String   @default("system")
+  updatedBy String   @default("system")
+
+  account   Account  @relation(fields: [accountId], references: [id])
+}
+
+// 3.6 Site Relationship
+model SiteRelationship {
+  id              Int      @id @default(autoincrement())
+  name            String
+  active          Boolean  @default(true)
+  aphSiteId       Int
+  cryoSiteId      Int?
+  cryoPreference  String?
+  mfgSiteId       Int
+  mfgPreference   String
+  wdcSiteId       Int?
+  infusionSiteId  Int?
+  effectiveDate   DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String   @default("system")
+  updatedBy       String   @default("system")
+
+  aphSite         Account  @relation("AphSite", fields: [aphSiteId], references: [id])
+  cryoSite        Account? @relation("CryoSite", fields: [cryoSiteId], references: [id])
+  mfgSite         Account  @relation("MfgSite", fields: [mfgSiteId], references: [id])
+  wdcSite         Account? @relation("WdcSite", fields: [wdcSiteId], references: [id])
+  infusionSite    Account? @relation("InfusionSite", fields: [infusionSiteId], references: [id])
+}
+
+// 3.7 IBP
+model Ibp {
+  id                 Int      @id @default(autoincrement())
+  name               String   @unique
+  mfgSiteId          Int
+  month              Int
+  year               Int
+  commercialCapacity Int
+  clinicalCapacity   Int
+  nonPatientCapacity Int
+  reserveCapacity    Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String   @default("system")
+  updatedBy          String   @default("system")
+
+  mfgSite            Account  @relation(fields: [mfgSiteId], references: [id])
+
+  @@unique([mfgSiteId, month, year])
+}
+
+// 3.8 MPS
+model Mps {
+  id                 Int      @id @default(autoincrement())
+  name               String   @unique
+  mfgSiteId          Int
+  date               DateTime
+  patientCapacity    Int
+  nonPatientCapacity Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String   @default("system")
+  updatedBy          String   @default("system")
+
+  mfgSite            Account  @relation(fields: [mfgSiteId], references: [id])
+
+  @@unique([mfgSiteId, date])
+}
+
+// 3.9 GDLT
+model Gdlt {
+  id        Int      @id @default(autoincrement())
+  name      String
+  siteId    Int
+  productId Int
+  mfgType   String
+  exactLt   Int?
+  minLt     Int?
+  maxLt     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String   @default("system")
+  updatedBy String   @default("system")
+
+  site      Account  @relation(fields: [siteId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+// 3.10 Daily Capacity
+model DailyCapacity {
+  id                     Int      @id @default(autoincrement())
+  name                   String   @unique
+  date                   DateTime
+  capacityType           String
+  siteType               String
+  baseCapacity           Int
+  bookedCapacity         Int      @default(0)
+  overallocationCapacity Int      @default(0)
+  remainingCapacity      Int
+  mfgType                String?
+  siteId                 Int
+  productCode            String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  site                   Account  @relation(fields: [siteId], references: [id])
+  cryoOrders             OrderReservation[] @relation("CryoCapacity")
+  mfgOrders              OrderReservation[] @relation("MfgCapacity")
+}
+
+// 3.11 Order Reservation
+model OrderReservation {
+  id                  String   @id @default(cuid())
+  status              String   @default("Booked")
+  country             String
+  productId           Int
+  therapyType         String
+  cryoType            String
+  cryoCapacityId      Int?
+  mfgCapacityId       Int
+  originalPdd         DateTime
+  plannedPdd          DateTime
+  aphSiteId           Int
+  cryoSiteId          Int?
+  mfgSiteId           Int
+  wdcSiteId           Int?
+  infusionSiteId      Int
+  remanufacturingFlag Boolean  @default(false)
+  reapheresisFlag     Boolean  @default(false)
+  aphPickupDate       DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  product             Product       @relation(fields: [productId], references: [id])
+  cryoCapacity        DailyCapacity? @relation("CryoCapacity", fields: [cryoCapacityId], references: [id])
+  mfgCapacity         DailyCapacity  @relation("MfgCapacity", fields: [mfgCapacityId], references: [id])
+  aphSite             Account        @relation("OrderAphSite", fields: [aphSiteId], references: [id])
+  cryoSite            Account?       @relation("OrderCryoSite", fields: [cryoSiteId], references: [id])
+  mfgSite             Account        @relation("OrderMfgSite", fields: [mfgSiteId], references: [id])
+  wdcSite             Account?       @relation("OrderWdcSite", fields: [wdcSiteId], references: [id])
+  infusionSite        Account        @relation("OrderInfusionSite", fields: [infusionSiteId], references: [id])
+  milestones          OrderMilestone[]
+}
+
+// 3.12 Order Milestones
+model OrderMilestone {
+  id                 Int       @id @default(autoincrement())
+  orderReservationId String
+  milestoneName      String
+  milestoneId        String    @unique @default(cuid())
+  leg                Int
+  sequentialLeg      Int
+  plannedDate        DateTime
+  actualDate         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  orderReservation   OrderReservation @relation(fields: [orderReservationId], references: [id])
+}
+
+// 3.13 Utilization & Queue Tables
+model UtilizationQueue {
+  id                   Int      @id @default(autoincrement())
+  dateRangeType        String
+  dateRangeValue       String
+  siteType             String
+  siteName             String
+  minUtilizationTarget Float?
+  maxAphReceipts       Int?
+  currentAphReceipts   Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdBy            String   @default("system")
+  updatedBy            String   @default("system")
+}
+
+// Audit Log
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  objectType String
+  recordId   String
+  action     String
+  field      String?
+  oldValue   String?
+  newValue   String?
+  userId     String   @default("system")
+  scenarioId Int?
+  timestamp  DateTime @default(now())
+}
+
+// Scenario Planning
+model Scenario {
+  id              Int       @id @default(autoincrement())
+  name            String
+  description     String?
+  status          String    @default("Draft") // Draft, Active, Committed, Archived
+  parentId        Int?
+  depth           Int       @default(0)
+  createdBy       String    @default("system")
+  updatedBy       String    @default("system")
+  lastRefreshedAt DateTime  @default(now())
+  committedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  parent          Scenario?           @relation("ScenarioTree", fields: [parentId], references: [id])
+  children        Scenario[]          @relation("ScenarioTree")
+  overrides       ScenarioOverride[]
+}
+
+model ScenarioOverride {
+  id          Int      @id @default(autoincrement())
+  scenarioId  Int
+  objectType  String   // DailyCapacity, Ibp, Mps, OrderReservation, OrderMilestone, UtilizationQueue
+  recordId    String   // PK of original record (stringified)
+  action      String   // update, create, delete
+  field       String?  // null for create (full row) and delete (tombstone)
+  newValue    String?  // JSON-encoded value; null for delete
+  baseValue   String?  // snapshot at override time for conflict detection
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, objectType, recordId, field])
+  @@index([scenarioId, objectType])
+  @@index([scenarioId, objectType, recordId])
+}
