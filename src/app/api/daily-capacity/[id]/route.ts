@@ -21,19 +21,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const old = await db.dailyCapacity.findUnique({ where: { id: parseInt(id) } })
   if (!old) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Only allow editing baseCapacity and overallocationCapacity
+  // Editable fields: baseCapacity, bookedCapacity, overallocationCapacity, mfgType
   const allowedFields: Record<string, unknown> = {}
   if (body.baseCapacity !== undefined) allowedFields.baseCapacity = body.baseCapacity
+  if (body.bookedCapacity !== undefined) allowedFields.bookedCapacity = body.bookedCapacity
   if (body.overallocationCapacity !== undefined) allowedFields.overallocationCapacity = body.overallocationCapacity
+  if (body.mfgType !== undefined) allowedFields.mfgType = body.mfgType || null
 
   // Recalculate remainingCapacity
   const baseCapacity = allowedFields.baseCapacity ?? (old as Record<string, unknown>).baseCapacity as number
-  const bookedCapacity = (old as Record<string, unknown>).bookedCapacity as number
+  const bookedCapacity = allowedFields.bookedCapacity ?? (old as Record<string, unknown>).bookedCapacity as number
   const overallocationCapacity = allowedFields.overallocationCapacity ?? (old as Record<string, unknown>).overallocationCapacity as number
   const siteType = (old as Record<string, unknown>).siteType as string
 
   let remainingCapacity: number
-  if (siteType === 'Cryo') {
+  if (siteType === 'Cryopreservation') {
     // Cryo: Base - Booked
     remainingCapacity = (baseCapacity as number) - (bookedCapacity as number)
   } else {

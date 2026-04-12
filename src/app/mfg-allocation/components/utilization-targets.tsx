@@ -76,7 +76,7 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
             <TableRow className="bg-gray-50/80">
               <TableHead className="text-xs font-semibold">{rangeType === "Weekly" ? "Week" : "Month"}</TableHead>
               <TableHead className="text-xs font-semibold">{siteType} Site</TableHead>
-              <TableHead className="text-xs font-semibold">Min Utilization Target (%)</TableHead>
+              <TableHead className="text-xs font-semibold">Min Utilization Target</TableHead>
               <TableHead className="text-xs font-semibold w-24">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -92,7 +92,7 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
                     placeholder="Site name" className="h-8 text-sm" />
                 </TableCell>
                 <TableCell>
-                  <Input type="number" value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
+                  <Input type="number" min={0} step={1} value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
                     placeholder="Blank = unconstrained" className="h-8 text-sm" />
                 </TableCell>
                 <TableCell>

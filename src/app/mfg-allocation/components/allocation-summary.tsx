@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { cn, formatDate, utilizationColor, remainingColor } from "@/lib/utils"
-import { BarChart3, TrendingUp, AlertTriangle, Zap } from "lucide-react"
+import { BarChart3, TrendingUp, AlertTriangle, Zap, Check, X } from "lucide-react"
 
 interface DailyCapacity {
   id: number; name: string; date: string; capacityType: string; siteType: string
@@ -243,47 +243,171 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
         </div>
       )}
 
-      {/* Detailed Daily View */}
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b bg-gray-50/80">
-          <h3 className="text-sm font-semibold text-gray-700">Daily Capacity Detail</h3>
-          <p className="text-[10px] text-gray-400">{data.length} records, sorted by date ascending</p>
-        </div>
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/50">
-                <TableHead className="text-xs">Date</TableHead>
-                <TableHead className="text-xs">Capacity Name</TableHead>
-                <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs text-right">Base</TableHead>
-                <TableHead className="text-xs text-right">Booked</TableHead>
-                {isMfg && <TableHead className="text-xs text-right">Over-alloc</TableHead>}
-                <TableHead className="text-xs text-right">Remaining</TableHead>
-                {isMfg && <TableHead className="text-xs">Mfgtype</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((d) => (
-                <TableRow key={d.id} className={cn(remainingColor(d.remainingCapacity))}>
+      {/* Detailed Daily View — Inline Editable */}
+      <DailyCapacityDetail data={data} isMfg={isMfg} onRefresh={fetchData} />
+    </div>
+  )
+}
+
+// ── Inline-editable Daily Capacity Detail sub-component ──
+const MFGTYPE_OPTIONS = [
+  { value: "Fresh", label: "Fresh" },
+  { value: "Frozen", label: "Frozen" },
+  { value: "Fresh & Frozen", label: "Fresh & Frozen" },
+]
+
+function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]; isMfg: boolean; onRefresh: () => void }) {
+  const [editId, setEditId] = useState<number | null>(null)
+  const [editValues, setEditValues] = useState<{ baseCapacity: number; bookedCapacity: number; overallocationCapacity: number; mfgType: string | null }>({
+    baseCapacity: 0, bookedCapacity: 0, overallocationCapacity: 0, mfgType: null,
+  })
+  const [saving, setSaving] = useState(false)
+
+  const startEdit = (d: DailyCapacity) => {
+    setEditId(d.id)
+    setEditValues({
+      baseCapacity: d.baseCapacity,
+      bookedCapacity: d.bookedCapacity,
+      overallocationCapacity: d.overallocationCapacity,
+      mfgType: d.mfgType,
+    })
+  }
+
+  const cancelEdit = () => setEditId(null)
+
+  const saveEdit = async (id: number) => {
+    setSaving(true)
+    await fetch(`/api/daily-capacity/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editValues),
+    })
+    setSaving(false)
+    setEditId(null)
+    onRefresh()
+  }
+
+  const calcRemaining = () => {
+    if (isMfg) return editValues.baseCapacity - editValues.bookedCapacity + editValues.overallocationCapacity
+    return editValues.baseCapacity - editValues.bookedCapacity
+  }
+
+  const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+  return (
+    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b bg-gray-50/80">
+        <h3 className="text-sm font-semibold text-gray-700">Daily Capacity Detail</h3>
+        <p className="text-[10px] text-gray-400">{data.length} records &middot; click a row to edit Base, Booked, Over-alloc, or Mfgtype</p>
+      </div>
+      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
+            <TableRow className="bg-gray-50/95">
+              <TableHead className="text-xs">Date</TableHead>
+              <TableHead className="text-xs">Capacity Name</TableHead>
+              <TableHead className="text-xs">Type</TableHead>
+              <TableHead className="text-xs text-right">Base</TableHead>
+              <TableHead className="text-xs text-right">Booked</TableHead>
+              {isMfg && <TableHead className="text-xs text-right">Over-alloc</TableHead>}
+              <TableHead className="text-xs text-right">Remaining</TableHead>
+              {isMfg && <TableHead className="text-xs">Mfgtype</TableHead>}
+              <TableHead className="text-xs w-16"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((d) => {
+              const isEditing = editId === d.id
+              const remaining = isEditing ? calcRemaining() : d.remainingCapacity
+
+              return (
+                <TableRow
+                  key={d.id}
+                  className={cn(
+                    isEditing ? "bg-blue-50/50 ring-1 ring-blue-200 ring-inset" : remainingColor(d.remainingCapacity),
+                    !isEditing && "cursor-pointer hover:bg-gray-50"
+                  )}
+                  onClick={() => { if (!isEditing) startEdit(d) }}
+                >
                   <TableCell className="text-sm">{formatDate(d.date)}</TableCell>
                   <TableCell className="font-mono text-xs text-gray-600">{d.name}</TableCell>
                   <TableCell><Badge variant="secondary" className="text-[10px]">{d.capacityType}</Badge></TableCell>
-                  <TableCell className="text-right font-medium">{d.baseCapacity}</TableCell>
-                  <TableCell className="text-right">{d.bookedCapacity}</TableCell>
-                  {isMfg && <TableCell className="text-right">{d.overallocationCapacity}</TableCell>}
-                  <TableCell className={cn("text-right font-bold", d.remainingCapacity <= 0 ? "text-red-600" : d.remainingCapacity === 1 ? "text-amber-600" : "text-green-600")}>
-                    {d.remainingCapacity}
+
+                  {/* Base — editable */}
+                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                    {isEditing ? (
+                      <Input type="number" min={0} value={editValues.baseCapacity}
+                        onChange={e => setEditValues(v => ({ ...v, baseCapacity: parseInt(e.target.value) || 0 }))}
+                        className="h-7 w-16 text-right text-sm ml-auto" />
+                    ) : (
+                      <span className="font-medium">{d.baseCapacity}</span>
+                    )}
                   </TableCell>
-                  {isMfg && <TableCell>{d.mfgType && <Badge variant={d.mfgType === "Fresh" ? "info" : "purple"} className="text-[10px]">{d.mfgType}</Badge>}</TableCell>}
+
+                  {/* Booked — editable */}
+                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                    {isEditing ? (
+                      <Input type="number" min={0} value={editValues.bookedCapacity}
+                        onChange={e => setEditValues(v => ({ ...v, bookedCapacity: parseInt(e.target.value) || 0 }))}
+                        className="h-7 w-16 text-right text-sm ml-auto" />
+                    ) : (
+                      <span>{d.bookedCapacity}</span>
+                    )}
+                  </TableCell>
+
+                  {/* Over-alloc — editable (Mfg only) */}
+                  {isMfg && (
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                      {isEditing ? (
+                        <Input type="number" min={0} value={editValues.overallocationCapacity}
+                          onChange={e => setEditValues(v => ({ ...v, overallocationCapacity: parseInt(e.target.value) || 0 }))}
+                          className="h-7 w-16 text-right text-sm ml-auto" />
+                      ) : (
+                        <span>{d.overallocationCapacity}</span>
+                      )}
+                    </TableCell>
+                  )}
+
+                  {/* Remaining — computed, read-only */}
+                  <TableCell className={cn("text-right font-bold", remaining <= 0 ? "text-red-600" : remaining === 1 ? "text-amber-600" : "text-green-600")}>
+                    {remaining}
+                  </TableCell>
+
+                  {/* Mfgtype — editable (Mfg only) */}
+                  {isMfg && (
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      {isEditing ? (
+                        <Select value={editValues.mfgType || ""} onChange={e => setEditValues(v => ({ ...v, mfgType: e.target.value || null }))}
+                          options={MFGTYPE_OPTIONS} placeholder="—" className="h-7 text-[10px] w-28" />
+                      ) : (
+                        d.mfgType && <Badge variant={d.mfgType === "Fresh" ? "info" : "purple"} className="text-[10px]">{d.mfgType}</Badge>
+                      )}
+                    </TableCell>
+                  )}
+
+                  {/* Save / Cancel actions */}
+                  <TableCell onClick={e => e.stopPropagation()}>
+                    {isEditing && (
+                      <div className="flex gap-0.5">
+                        <button onClick={() => saveEdit(d.id)} disabled={saving}
+                          className="rounded p-1 hover:bg-green-100 text-green-600 transition">
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={cancelEdit}
+                          className="rounded p-1 hover:bg-red-100 text-red-500 transition">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </TableCell>
                 </TableRow>
-              ))}
-              {data.length === 0 && (
-                <TableRow><TableCell colSpan={isMfg ? 8 : 6} className="text-center py-8 text-gray-400">No capacity records found. Generate allocations first.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              )
+            })}
+            {data.length === 0 && (
+              <TableRow><TableCell colSpan={isMfg ? 9 : 7} className="text-center py-8 text-gray-400">No capacity records found. Generate allocations first.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
