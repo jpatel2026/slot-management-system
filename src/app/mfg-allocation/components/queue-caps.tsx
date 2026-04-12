@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select } from "@/components/ui/select"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Plus, Save, Trash2, ShieldAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -51,6 +52,7 @@ interface QueueRow {
   dateRangeValue: string
   siteType: string
   siteName: string
+  productCode?: string | null
   maxAphReceipts: number | null
   currentAphReceipts: number
 }
@@ -61,6 +63,11 @@ interface AllocationFilters {
 
 export function QueueCaps({ filters }: { filters: AllocationFilters }) {
   const [data, setData] = useState<QueueRow[]>([])
+  const [products, setProducts] = useState<{ code: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch("/api/products?active=true").then(r => r.json()).then((p: { code: string; name: string }[]) => setProducts(p))
+  }, [])
 
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType: "Manufacturing", dateRangeType: "Weekly" })
@@ -71,6 +78,7 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
         params.set("siteName", site.name)
       }
     }
+    if (filters.selectedProduct) params.set("productCode", filters.selectedProduct)
     const res = await fetch(`/api/utilization?${params}`)
     const all = await res.json()
     setData(all.filter((r: QueueRow) => r.maxAphReceipts !== null || r.currentAphReceipts > 0))
@@ -84,6 +92,7 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
       dateRangeValue: "",
       siteType: "Manufacturing",
       siteName: "",
+      productCode: filters.selectedProduct || "",
       maxAphReceipts: null,
       currentAphReceipts: 0,
     }])
@@ -124,6 +133,7 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
             <TableRow className="bg-gray-50/80">
               <TableHead className="text-xs font-semibold">Week</TableHead>
               <TableHead className="text-xs font-semibold">Mfg Site</TableHead>
+              <TableHead className="text-xs font-semibold">Product</TableHead>
               <TableHead className="text-xs font-semibold">Max Aph Receipts</TableHead>
               <TableHead className="text-xs font-semibold">Current Aph Receipts</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
@@ -150,6 +160,11 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
                       placeholder="Site name" className="h-8 text-sm" />
                   </TableCell>
                   <TableCell>
+                    <Select value={row.productCode || ""} onChange={e => handleChange(idx, "productCode", e.target.value || null)}
+                      options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
+                      placeholder="All" className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
                     <Input type="number" value={row.maxAphReceipts ?? ""} onChange={e => handleChange(idx, "maxAphReceipts", e.target.value ? Number(e.target.value) : null)}
                       className="h-8 text-sm" />
                   </TableCell>
@@ -172,7 +187,7 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
               )
             })}
             {data.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No queue caps configured.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">No queue caps configured.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

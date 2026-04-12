@@ -11,10 +11,13 @@ export async function GET(req: NextRequest) {
   const siteName = searchParams.get('siteName')
   const dateRangeType = searchParams.get('dateRangeType')
 
+  const productCode = searchParams.get('productCode')
+
   const where: Record<string, unknown> = {}
   if (siteType) where.siteType = siteType
   if (siteName) where.siteName = siteName
   if (dateRangeType) where.dateRangeType = dateRangeType
+  if (productCode) where.productCode = productCode
 
   const utilization = await db.utilizationQueue.findMany({
     where,

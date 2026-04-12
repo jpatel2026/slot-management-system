@@ -317,6 +317,7 @@ model UtilizationQueue {
   dateRangeValue       String
   siteType             String
   siteName             String
+  productCode          String?
   minUtilizationTarget Float?
   currentUtilization   Float?
   maxAphReceipts       Int?
@@ -325,6 +326,8 @@ model UtilizationQueue {
   updatedAt            DateTime @updatedAt
   createdBy            String   @default("system")
   updatedBy            String   @default("system")
+
+  @@index([siteType, productCode])
 }
 
 // Audit Log

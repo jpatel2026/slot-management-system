@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select } from "@/components/ui/select"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Plus, Save, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -53,6 +54,7 @@ interface UtilTarget {
   dateRangeValue: string
   siteType: string
   siteName: string
+  productCode?: string | null
   minUtilizationTarget: number | null
   currentUtilization?: number | null
 }
@@ -64,16 +66,22 @@ interface AllocationFilters {
 export function UtilizationTargets({ siteType, rangeType, filters }: { siteType: string; rangeType: string; filters: AllocationFilters }) {
   const [data, setData] = useState<UtilTarget[]>([])
 
+  const [products, setProducts] = useState<{ code: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch("/api/products?active=true").then(r => r.json()).then((p: { code: string; name: string }[]) => setProducts(p))
+  }, [])
+
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType, dateRangeType: rangeType })
     if (filters.selectedSite) {
-      // Look up site name for filtering
       const siteRes = await fetch(`/api/accounts/${filters.selectedSite}`)
       if (siteRes.ok) {
         const site = await siteRes.json()
         params.set("siteName", site.name)
       }
     }
+    if (filters.selectedProduct) params.set("productCode", filters.selectedProduct)
     const res = await fetch(`/api/utilization?${params}`)
     setData(await res.json())
   }, [siteType, rangeType, filters])
@@ -86,6 +94,7 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
       dateRangeValue: "",
       siteType,
       siteName: "",
+      productCode: filters.selectedProduct || "",
       minUtilizationTarget: null,
       currentUtilization: null,
     }])
@@ -138,6 +147,7 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
             <TableRow className="bg-gray-50/95">
               <TableHead className="text-xs font-semibold">{rangeType === "Weekly" ? "Week" : "Month"}</TableHead>
               <TableHead className="text-xs font-semibold">{siteType} Site</TableHead>
+              <TableHead className="text-xs font-semibold">Product</TableHead>
               <TableHead className="text-xs font-semibold">Min Utilization Target</TableHead>
               <TableHead className="text-xs font-semibold">Current Utilization</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
@@ -163,6 +173,11 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
                   <TableCell>
                     <Input value={row.siteName} onChange={e => handleChange(idx, "siteName", e.target.value)}
                       placeholder="Site name" className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Select value={row.productCode || ""} onChange={e => handleChange(idx, "productCode", e.target.value || null)}
+                      options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
+                      placeholder="All" className="h-8 text-sm" />
                   </TableCell>
                   <TableCell>
                     <Input type="number" min={0} step={1} value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
@@ -197,7 +212,7 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
               )
             })}
             {data.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No utilization targets set. Click &quot;Add Row&quot; to begin.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">No utilization targets set. Click &quot;Add Row&quot; to begin.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
