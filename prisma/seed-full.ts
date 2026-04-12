@@ -590,53 +590,61 @@ async function main() {
   console.log(`  ${milestoneCount} Milestones created`)
 
   // =====================================================
-  // 12. UTILIZATION & QUEUE TABLES
+  // 12. UTILIZATION & QUEUE TABLES — per product
   // =====================================================
   let utilCount = 0
   const weeks = ['W1-May-2026', 'W2-May-2026', 'W3-May-2026', 'W4-May-2026',
     'W1-Jun-2026', 'W2-Jun-2026', 'W3-Jun-2026', 'W4-Jun-2026',
     'W1-Jul-2026', 'W2-Jul-2026', 'W3-Jul-2026', 'W4-Jul-2026']
   const months = ['May-2026', 'Jun-2026', 'Jul-2026']
+  const seedProductCodes = ['CA1', 'CA2']
 
   for (const mfgKey of mfgSiteKeys) {
     const siteName = sites[mfgKey].name
-    // Weekly util targets
-    for (const w of weeks) {
-      await prisma.utilizationQueue.create({
-        data: {
-          dateRangeType: 'Weekly', dateRangeValue: w,
-          siteType: 'Manufacturing', siteName,
-          minUtilizationTarget: randomInt(85, 95),
-          maxAphReceipts: randomInt(8, 15),
-          currentAphReceipts: randomInt(2, 12),
-        },
-      })
-      utilCount++
-    }
-    // Monthly util targets
-    for (const m of months) {
-      await prisma.utilizationQueue.create({
-        data: {
-          dateRangeType: 'Monthly', dateRangeValue: m,
-          siteType: 'Manufacturing', siteName,
-          minUtilizationTarget: randomInt(90, 98),
-        },
-      })
-      utilCount++
+    for (const pc of seedProductCodes) {
+      // Weekly util targets per product
+      for (const w of weeks) {
+        await prisma.utilizationQueue.create({
+          data: {
+            dateRangeType: 'Weekly', dateRangeValue: w,
+            siteType: 'Manufacturing', siteName, productCode: pc,
+            minUtilizationTarget: randomInt(80, 95),
+            currentUtilization: randomInt(50, 100) as number,
+            maxAphReceipts: randomInt(5, 12),
+            currentAphReceipts: randomInt(1, 10),
+          },
+        })
+        utilCount++
+      }
+      // Monthly util targets per product
+      for (const m of months) {
+        await prisma.utilizationQueue.create({
+          data: {
+            dateRangeType: 'Monthly', dateRangeValue: m,
+            siteType: 'Manufacturing', siteName, productCode: pc,
+            minUtilizationTarget: randomInt(85, 98),
+            currentUtilization: randomInt(60, 100) as number,
+          },
+        })
+        utilCount++
+      }
     }
   }
 
   for (const cryoKey of cryoSiteKeys) {
     const siteName = sites[cryoKey].name
-    for (const w of weeks) {
-      await prisma.utilizationQueue.create({
-        data: {
-          dateRangeType: 'Weekly', dateRangeValue: w,
-          siteType: 'Cryopreservation', siteName,
-          minUtilizationTarget: randomInt(80, 92),
-        },
-      })
-      utilCount++
+    for (const pc of seedProductCodes) {
+      for (const w of weeks) {
+        await prisma.utilizationQueue.create({
+          data: {
+            dateRangeType: 'Weekly', dateRangeValue: w,
+            siteType: 'Cryopreservation', siteName, productCode: pc,
+            minUtilizationTarget: randomInt(75, 92),
+            currentUtilization: randomInt(40, 95) as number,
+          },
+        })
+        utilCount++
+      }
     }
   }
   console.log(`  ${utilCount} Utilization/Queue records created`)

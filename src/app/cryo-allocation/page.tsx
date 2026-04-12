@@ -55,7 +55,7 @@ export default function CryoAllocationPage() {
             value={draft.selectedProduct}
             onChange={e => setDraft(f => ({ ...f, selectedProduct: e.target.value }))}
             options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
-            placeholder="All products"
+            placeholder="Select product"
           />
         </div>
         <div>

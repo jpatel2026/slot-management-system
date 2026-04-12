@@ -3,7 +3,6 @@ import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Select } from "@/components/ui/select"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Plus, Save, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -65,12 +64,6 @@ interface AllocationFilters {
 
 export function UtilizationTargets({ siteType, rangeType, filters }: { siteType: string; rangeType: string; filters: AllocationFilters }) {
   const [data, setData] = useState<UtilTarget[]>([])
-
-  const [products, setProducts] = useState<{ code: string; name: string }[]>([])
-
-  useEffect(() => {
-    fetch("/api/products?active=true").then(r => r.json()).then((p: { code: string; name: string }[]) => setProducts(p))
-  }, [])
 
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType, dateRangeType: rangeType })
@@ -175,9 +168,7 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
                       placeholder="Site name" className="h-8 text-sm" />
                   </TableCell>
                   <TableCell>
-                    <Select value={row.productCode || ""} onChange={e => handleChange(idx, "productCode", e.target.value || null)}
-                      options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
-                      placeholder="All" className="h-8 text-sm" />
+                    <span className="text-sm font-medium text-gray-700">{row.productCode || "—"}</span>
                   </TableCell>
                   <TableCell>
                     <Input type="number" min={0} step={1} value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
