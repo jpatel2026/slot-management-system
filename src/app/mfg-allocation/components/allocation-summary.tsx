@@ -273,6 +273,25 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
     return editValues.baseCapacity - editValues.bookedCapacity
   }
 
+  // Color coding: green = fully booked, red = far from booked
+  const bookingRowColor = (d: DailyCapacity) => {
+    if (d.baseCapacity === 0) return ""
+    const pct = (d.bookedCapacity / d.baseCapacity) * 100
+    if (pct >= 100) return "bg-green-50"
+    if (pct >= 80) return "bg-emerald-50/50"
+    if (pct >= 50) return "bg-amber-50/50"
+    return "bg-red-50/50"
+  }
+
+  const bookingTextColor = (base: number, booked: number) => {
+    if (base === 0) return "text-gray-400"
+    const pct = (booked / base) * 100
+    if (pct >= 100) return "text-green-600"
+    if (pct >= 80) return "text-emerald-600"
+    if (pct >= 50) return "text-amber-600"
+    return "text-red-600"
+  }
+
   const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   return (
@@ -305,7 +324,7 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
                 <TableRow
                   key={d.id}
                   className={cn(
-                    isEditing ? "bg-blue-50/50 ring-1 ring-blue-200 ring-inset" : remainingColor(d.remainingCapacity),
+                    isEditing ? "bg-blue-50/50 ring-1 ring-blue-200 ring-inset" : bookingRowColor(d),
                     !isEditing && "cursor-pointer hover:bg-gray-50"
                   )}
                   onClick={() => { if (!isEditing) startEdit(d) }}
@@ -349,8 +368,11 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
                     </TableCell>
                   )}
 
-                  {/* Remaining — computed, read-only */}
-                  <TableCell className={cn("text-right font-bold", remaining <= 0 ? "text-red-600" : remaining === 1 ? "text-amber-600" : "text-green-600")}>
+                  {/* Remaining — computed, read-only. Green = fully booked, Red = far from booked */}
+                  <TableCell className={cn("text-right font-bold", isEditing
+                    ? bookingTextColor(editValues.baseCapacity, editValues.bookedCapacity)
+                    : bookingTextColor(d.baseCapacity, d.bookedCapacity)
+                  )}>
                     {remaining}
                   </TableCell>
 
