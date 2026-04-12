@@ -15,7 +15,7 @@ interface DailyCapacity {
 }
 
 interface WeekSummary {
-  week: string; weekStart: string; weekEnd: string
+  week: string; weekStart: string; weekStartDisplay: string; weekEnd: string
   commercial: { base: number; booked: number; pct: number }
   clinical: { base: number; booked: number; pct: number }
   nonPatient: { base: number; booked: number; pct: number }
@@ -85,7 +85,8 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
 
       return {
         week: `W${Math.ceil((ws.getDate()) / 7)}`,
-        weekStart: formatDate(ws),
+        weekStart: ws.toISOString().split("T")[0],
+        weekStartDisplay: formatDate(ws),
         weekEnd: formatDate(we),
         commercial: siteType === "Manufacturing" ? commercial : patient,
         clinical,
@@ -93,7 +94,12 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
         reserve,
         total: { base: totalBase, booked: totalBooked, pct: totalBase > 0 ? Math.round((totalBooked / totalBase) * 100) : 0 },
       }
-    }).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+    }).sort((a, b) => {
+      // Ascending by actual date (earliest week first)
+      const da = new Date(a.weekStart)
+      const db = new Date(b.weekStart)
+      return da.getTime() - db.getTime()
+    })
   })()
 
   const grandTotal = {
@@ -176,7 +182,7 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
           <div className="px-5 py-3 border-b bg-gray-50/80">
             <h3 className="text-sm font-semibold text-gray-700">Weekly Utilization Heatmap</h3>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/50">
@@ -193,7 +199,7 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
                   <TableRow key={w.weekStart}>
                     <TableCell className="font-medium text-sm">
                       <div>{w.week}</div>
-                      <div className="text-[10px] text-gray-400">{w.weekStart} – {w.weekEnd}</div>
+                      <div className="text-[10px] text-gray-400">{w.weekStartDisplay} – {w.weekEnd}</div>
                     </TableCell>
                     <TableCell>
                       <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-medium heatmap-cell", utilizationColor(w.commercial.pct))}>
@@ -241,8 +247,9 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b bg-gray-50/80">
           <h3 className="text-sm font-semibold text-gray-700">Daily Capacity Detail</h3>
+          <p className="text-[10px] text-gray-400">{data.length} records, sorted by date ascending</p>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50/50">
@@ -257,7 +264,7 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.slice(0, 100).map((d) => (
+              {[...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((d) => (
                 <TableRow key={d.id} className={cn(remainingColor(d.remainingCapacity))}>
                   <TableCell className="text-sm">{formatDate(d.date)}</TableCell>
                   <TableCell className="font-mono text-xs text-gray-600">{d.name}</TableCell>
@@ -277,11 +284,6 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
             </TableBody>
           </Table>
         </div>
-        {data.length > 100 && (
-          <div className="px-5 py-2 border-t bg-gray-50/50 text-xs text-gray-400">
-            Showing 100 of {data.length} records
-          </div>
-        )}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Select } from "@/components/ui/select"
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { ChevronDown, ChevronUp, Download, ExternalLink, Filter } from "lucide-react"
+import { ChevronDown, ChevronUp, ChevronsUpDown, Download, ExternalLink, Filter } from "lucide-react"
 import { cn, formatDate, exportToCSV } from "@/lib/utils"
 
 interface Order {
@@ -29,6 +29,39 @@ const statusColors: Record<string, string> = {
   "On Hold": "destructive",
 }
 
+type SortKey = "order" | "status" | "mfgType" | "aphPickup" | "cryoType" | "cryoId" | "mfgId" | "fpRelease" | "fpDelivery" | "a2m" | "a2r" | "a2d"
+type SortDir = "asc" | "desc"
+
+function getMilestoneDate(order: Order, name: string): string {
+  const ms = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(name.toLowerCase()))
+  if (!ms) return "—"
+  return ms.actualDate ? formatDate(ms.actualDate) : formatDate(ms.plannedDate)
+}
+
+function getMilestoneDateRaw(order: Order, name: string): number {
+  const ms = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(name.toLowerCase()))
+  if (!ms) return 0
+  return new Date(ms.actualDate || ms.plannedDate).getTime()
+}
+
+function calcDaysBetween(order: Order, from: string, to: string): string {
+  const fromMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(from.toLowerCase()))
+  const toMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(to.toLowerCase()))
+  if (!fromMs || !toMs) return "—"
+  const d1 = new Date(fromMs.actualDate || fromMs.plannedDate)
+  const d2 = new Date(toMs.actualDate || toMs.plannedDate)
+  return String(Math.round((d2.getTime() - d1.getTime()) / 86400000))
+}
+
+function calcDaysBetweenRaw(order: Order, from: string, to: string): number {
+  const fromMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(from.toLowerCase()))
+  const toMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(to.toLowerCase()))
+  if (!fromMs || !toMs) return 99999
+  const d1 = new Date(fromMs.actualDate || fromMs.plannedDate)
+  const d2 = new Date(toMs.actualDate || toMs.plannedDate)
+  return Math.round((d2.getTime() - d1.getTime()) / 86400000)
+}
+
 export function OrderGrid() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +69,8 @@ export function OrderGrid() {
   const [filters, setFilters] = useState({
     status: "", therapyType: "", cryoType: "", country: "", mfgSiteId: "",
   })
+  const [sortKey, setSortKey] = useState<SortKey>("mfgId")
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -48,20 +83,56 @@ export function OrderGrid() {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  const getMilestoneDate = (order: Order, name: string): string => {
-    const ms = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(name.toLowerCase()))
-    if (!ms) return "—"
-    return ms.actualDate ? formatDate(ms.actualDate) : formatDate(ms.plannedDate)
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc")
+    } else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
   }
 
-  const calcDaysBetween = (order: Order, from: string, to: string): string => {
-    const fromMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(from.toLowerCase()))
-    const toMs = order.milestones?.find(m => m.milestoneName.toLowerCase().includes(to.toLowerCase()))
-    if (!fromMs || !toMs) return "—"
-    const d1 = new Date(fromMs.actualDate || fromMs.plannedDate)
-    const d2 = new Date(toMs.actualDate || toMs.plannedDate)
-    return String(Math.round((d2.getTime() - d1.getTime()) / 86400000))
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 opacity-30" />
+    return sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
   }
+
+  const sortedOrders = useMemo(() => {
+    const sorted = [...orders]
+    const dir = sortDir === "asc" ? 1 : -1
+
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case "order": return dir * a.id.localeCompare(b.id)
+        case "status": return dir * a.status.localeCompare(b.status)
+        case "mfgType": return dir * ((a.mfgCapacity?.mfgType || "").localeCompare(b.mfgCapacity?.mfgType || ""))
+        case "aphPickup": return dir * (getMilestoneDateRaw(a, "Apheresis Picked") - getMilestoneDateRaw(b, "Apheresis Picked"))
+        case "cryoType": return dir * a.cryoType.localeCompare(b.cryoType)
+        case "cryoId": return dir * ((a.cryoCapacity?.date || "").localeCompare(b.cryoCapacity?.date || ""))
+        // Mfg ID sorts by Mfg date
+        case "mfgId": return dir * (new Date(a.mfgCapacity?.date || 0).getTime() - new Date(b.mfgCapacity?.date || 0).getTime())
+        case "fpRelease": return dir * (getMilestoneDateRaw(a, "FP Released") - getMilestoneDateRaw(b, "FP Released"))
+        case "fpDelivery": return dir * (getMilestoneDateRaw(a, "FP Delivered") - getMilestoneDateRaw(b, "FP Delivered"))
+        case "a2m": return dir * (calcDaysBetweenRaw(a, "Apheresis Picked", "Manufacturing Started") - calcDaysBetweenRaw(b, "Apheresis Picked", "Manufacturing Started"))
+        case "a2r": return dir * (calcDaysBetweenRaw(a, "Apheresis Picked", "FP Released") - calcDaysBetweenRaw(b, "Apheresis Picked", "FP Released"))
+        case "a2d": return dir * (calcDaysBetweenRaw(a, "Apheresis Picked", "FP Delivered") - calcDaysBetweenRaw(b, "Apheresis Picked", "FP Delivered"))
+        default: return 0
+      }
+    })
+    return sorted
+  }, [orders, sortKey, sortDir])
+
+  const colHeader = (label: string, key: SortKey, className?: string) => (
+    <TableHead
+      className={cn("text-xs font-semibold cursor-pointer select-none hover:text-gray-700", className)}
+      onClick={() => handleSort(key)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <SortIcon col={key} />
+      </div>
+    </TableHead>
+  )
 
   return (
     <div className="space-y-4">
@@ -112,7 +183,14 @@ export function OrderGrid() {
 
       {/* Results bar */}
       <div className="flex items-center justify-between">
-        <Badge variant="secondary" className="font-mono text-xs">{orders.length} orders</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="font-mono text-xs">{orders.length} orders</Badge>
+          {sortKey && (
+            <span className="text-[10px] text-gray-400">
+              Sorted by <span className="font-medium text-gray-600">{sortKey}</span> {sortDir === "asc" ? "↑" : "↓"}
+            </span>
+          )}
+        </div>
         <Button variant="outline" size="sm" onClick={() => exportToCSV(orders.map(o => ({
           orderId: o.id, status: o.status, product: o.product?.code, therapyType: o.therapyType,
           cryoType: o.cryoType, mfgSite: o.mfgSite?.name, plannedPdd: o.plannedPdd,
@@ -121,28 +199,28 @@ export function OrderGrid() {
         </Button>
       </div>
 
-      {/* Order Table */}
+      {/* Order Table — scrollable */}
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50/80">
-                <TableHead className="text-xs font-semibold">Order</TableHead>
-                <TableHead className="text-xs font-semibold">Status</TableHead>
-                <TableHead className="text-xs font-semibold">Mfgtype</TableHead>
-                <TableHead className="text-xs font-semibold">Aph Pickup</TableHead>
-                <TableHead className="text-xs font-semibold">Cryo Type</TableHead>
-                <TableHead className="text-xs font-semibold">Cryo ID</TableHead>
-                <TableHead className="text-xs font-semibold">Mfg ID</TableHead>
-                <TableHead className="text-xs font-semibold">FP Release</TableHead>
-                <TableHead className="text-xs font-semibold">FP Delivery</TableHead>
-                <TableHead className="text-xs font-semibold text-center">A2M</TableHead>
-                <TableHead className="text-xs font-semibold text-center">A2R</TableHead>
-                <TableHead className="text-xs font-semibold text-center">A2D</TableHead>
+            <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
+              <TableRow className="bg-gray-50/95">
+                {colHeader("Order", "order")}
+                {colHeader("Status", "status")}
+                {colHeader("Mfgtype", "mfgType")}
+                {colHeader("Aph Pickup", "aphPickup")}
+                {colHeader("Cryo Type", "cryoType")}
+                {colHeader("Cryo ID", "cryoId")}
+                {colHeader("Mfg ID", "mfgId")}
+                {colHeader("FP Release", "fpRelease")}
+                {colHeader("FP Delivery", "fpDelivery")}
+                {colHeader("A2M", "a2m", "text-center")}
+                {colHeader("A2R", "a2r", "text-center")}
+                {colHeader("A2D", "a2d", "text-center")}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
+              {sortedOrders.map((order) => (
                 <TableRow key={order.id} className="animate-fade-in hover:bg-blue-50/30">
                   <TableCell>
                     <Link href={`/master-data/orders/${order.id}`} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
@@ -170,7 +248,10 @@ export function OrderGrid() {
                     ) : "—"}
                   </TableCell>
                   <TableCell>
-                    <span className="font-mono text-xs text-blue-600">{order.mfgCapacity?.name}</span>
+                    <div>
+                      <span className="font-mono text-xs text-blue-600">{order.mfgCapacity?.name}</span>
+                      <div className="text-[10px] text-gray-400">{order.mfgCapacity?.date ? formatDate(order.mfgCapacity.date) : ""}</div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm">{getMilestoneDate(order, "FP Released")}</TableCell>
                   <TableCell className="text-sm">{getMilestoneDate(order, "FP Delivered")}</TableCell>

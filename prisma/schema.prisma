@@ -200,6 +200,7 @@ model Mps {
   mfgSite            Account  @relation(fields: [mfgSiteId], references: [id])
 
   @@unique([mfgSiteId, date])
+  @@index([date])
 }
 
 // 3.9 GDLT
@@ -241,6 +242,12 @@ model DailyCapacity {
   site                   Account  @relation(fields: [siteId], references: [id])
   cryoOrders             OrderReservation[] @relation("CryoCapacity")
   mfgOrders              OrderReservation[] @relation("MfgCapacity")
+
+  @@index([siteId, siteType, date])
+  @@index([siteId, date])
+  @@index([date])
+  @@index([siteType, capacityType])
+  @@index([productCode])
 }
 
 // 3.11 Order Reservation
@@ -275,6 +282,13 @@ model OrderReservation {
   wdcSite             Account?       @relation("OrderWdcSite", fields: [wdcSiteId], references: [id])
   infusionSite        Account        @relation("OrderInfusionSite", fields: [infusionSiteId], references: [id])
   milestones          OrderMilestone[]
+
+  @@index([status])
+  @@index([mfgSiteId])
+  @@index([productId])
+  @@index([therapyType, cryoType])
+  @@index([mfgCapacityId])
+  @@index([cryoCapacityId])
 }
 
 // 3.12 Order Milestones
@@ -291,6 +305,9 @@ model OrderMilestone {
   updatedAt          DateTime  @updatedAt
 
   orderReservation   OrderReservation @relation(fields: [orderReservationId], references: [id])
+
+  @@index([orderReservationId])
+  @@index([plannedDate])
 }
 
 // 3.13 Utilization & Queue Tables
