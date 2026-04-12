@@ -1,7 +1,8 @@
 "use client"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
+import { Button } from "@/components/ui/button"
 import { Select } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,7 +10,7 @@ import { AllocationSummary } from "./components/allocation-summary"
 import { UtilizationTargets } from "./components/utilization-targets"
 import { QueueCaps } from "./components/queue-caps"
 import { GenerateAllocations } from "./components/generate-allocations"
-import { Filter } from "lucide-react"
+import { Filter, Search, X } from "lucide-react"
 
 export interface AllocationFilters {
   selectedSite: string
@@ -18,17 +19,23 @@ export interface AllocationFilters {
   dateTo: string
 }
 
+const EMPTY_FILTERS: AllocationFilters = { selectedSite: "", selectedProduct: "", dateFrom: "", dateTo: "" }
+
 export default function MfgAllocationPage() {
   const [sites, setSites] = useState<{ id: number; name: string }[]>([])
   const [products, setProducts] = useState<{ id: number; name: string; code: string }[]>([])
-  const [filters, setFilters] = useState<AllocationFilters>({
-    selectedSite: "", selectedProduct: "", dateFrom: "", dateTo: "",
-  })
+  const [draft, setDraft] = useState<AllocationFilters>({ ...EMPTY_FILTERS })
+  const [applied, setApplied] = useState<AllocationFilters>({ ...EMPTY_FILTERS })
 
   useEffect(() => {
     fetch("/api/accounts?siteType=Manufacturing&active=true").then(r => r.json()).then(setSites)
     fetch("/api/products?active=true").then(r => r.json()).then(setProducts)
   }, [])
+
+  const handleApply = () => setApplied({ ...draft })
+  const handleClear = () => { setDraft({ ...EMPTY_FILTERS }); setApplied({ ...EMPTY_FILTERS }) }
+  const hasFilters = applied.selectedSite || applied.selectedProduct || applied.dateFrom || applied.dateTo
+  const draftChanged = JSON.stringify(draft) !== JSON.stringify(applied)
 
   return (
     <div>
@@ -37,14 +44,14 @@ export default function MfgAllocationPage() {
         description="Manage manufacturing capacity, utilization targets, and generate daily allocations"
       />
 
-      {/* Global Filters — above tabs, applies to all sub-tabs */}
+      {/* Global Filters */}
       <div className="flex gap-3 items-end flex-wrap rounded-xl border bg-white p-4 shadow-sm mb-4">
         <Filter className="h-4 w-4 text-gray-400 shrink-0 mb-2" />
         <div className="min-w-[200px]">
           <Label className="text-xs text-gray-500">Manufacturing Site</Label>
           <Select
-            value={filters.selectedSite}
-            onChange={e => setFilters(f => ({ ...f, selectedSite: e.target.value }))}
+            value={draft.selectedSite}
+            onChange={e => setDraft(f => ({ ...f, selectedSite: e.target.value }))}
             options={sites.map(s => ({ value: String(s.id), label: s.name }))}
             placeholder="All sites"
           />
@@ -52,20 +59,32 @@ export default function MfgAllocationPage() {
         <div className="min-w-[180px]">
           <Label className="text-xs text-gray-500">Product</Label>
           <Select
-            value={filters.selectedProduct}
-            onChange={e => setFilters(f => ({ ...f, selectedProduct: e.target.value }))}
+            value={draft.selectedProduct}
+            onChange={e => setDraft(f => ({ ...f, selectedProduct: e.target.value }))}
             options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
             placeholder="All products"
           />
         </div>
         <div>
           <Label className="text-xs text-gray-500">From</Label>
-          <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} className="w-40" />
+          <Input type="date" value={draft.dateFrom} onChange={e => setDraft(f => ({ ...f, dateFrom: e.target.value }))} className="w-40" />
         </div>
         <div>
           <Label className="text-xs text-gray-500">To</Label>
-          <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} className="w-40" />
+          <Input type="date" value={draft.dateTo} onChange={e => setDraft(f => ({ ...f, dateTo: e.target.value }))} className="w-40" />
         </div>
+        <Button onClick={handleApply} className={draftChanged
+          ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/20"
+          : "bg-gray-900 hover:bg-gray-800"
+        }>
+          <Search className="h-3.5 w-3.5 mr-1.5" />
+          Apply Filters
+        </Button>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-500 hover:text-red-600">
+            <X className="h-3.5 w-3.5 mr-1" /> Clear
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="summary">
@@ -76,10 +95,10 @@ export default function MfgAllocationPage() {
           <TabsTrigger value="queue">Queue Caps</TabsTrigger>
           <TabsTrigger value="generate">Generate Allocations</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><AllocationSummary siteType="Manufacturing" filters={filters} /></TabsContent>
-        <TabsContent value="weekly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Weekly" filters={filters} /></TabsContent>
-        <TabsContent value="monthly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Monthly" filters={filters} /></TabsContent>
-        <TabsContent value="queue"><QueueCaps filters={filters} /></TabsContent>
+        <TabsContent value="summary"><AllocationSummary siteType="Manufacturing" filters={applied} /></TabsContent>
+        <TabsContent value="weekly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Weekly" filters={applied} /></TabsContent>
+        <TabsContent value="monthly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Monthly" filters={applied} /></TabsContent>
+        <TabsContent value="queue"><QueueCaps filters={applied} /></TabsContent>
         <TabsContent value="generate"><GenerateAllocations siteType="Manufacturing" /></TabsContent>
       </Tabs>
     </div>
