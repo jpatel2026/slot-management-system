@@ -2,8 +2,10 @@
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Plus, Save, Trash2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface UtilTarget {
   id?: number
@@ -12,11 +14,11 @@ interface UtilTarget {
   siteType: string
   siteName: string
   minUtilizationTarget: number | null
+  currentUtilization?: number | null
 }
 
 export function UtilizationTargets({ siteType, rangeType }: { siteType: string; rangeType: string }) {
   const [data, setData] = useState<UtilTarget[]>([])
-  const [editing, setEditing] = useState<Record<number, UtilTarget>>({})
 
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType, dateRangeType: rangeType })
@@ -33,12 +35,12 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
       siteType,
       siteName: "",
       minUtilizationTarget: null,
+      currentUtilization: null,
     }])
   }
 
   const handleChange = (idx: number, field: keyof UtilTarget, value: string | number | null) => {
     setData(prev => prev.map((row, i) => i === idx ? { ...row, [field]: value } : row))
-    setEditing(prev => ({ ...prev, [idx]: { ...data[idx], [field]: value } }))
   }
 
   const handleSave = async (idx: number) => {
@@ -50,7 +52,6 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(row),
     })
-    setEditing(prev => { const n = { ...prev }; delete n[idx]; return n })
     fetchData()
   }
 
@@ -62,6 +63,15 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
     setData(prev => prev.filter((_, i) => i !== idx))
   }
 
+  const getStatus = (row: UtilTarget) => {
+    if (row.minUtilizationTarget === null || row.minUtilizationTarget === undefined) return null
+    const current = row.currentUtilization ?? 0
+    const target = row.minUtilizationTarget
+    if (current >= target) return "met"
+    if (current >= target * 0.8) return "near"
+    return "below"
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -70,45 +80,67 @@ export function UtilizationTargets({ siteType, rangeType }: { siteType: string; 
           <Plus className="h-3.5 w-3.5 mr-1" /> Add Row
         </Button>
       </div>
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden max-h-[500px] overflow-y-auto">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50/80">
+          <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
+            <TableRow className="bg-gray-50/95">
               <TableHead className="text-xs font-semibold">{rangeType === "Weekly" ? "Week" : "Month"}</TableHead>
               <TableHead className="text-xs font-semibold">{siteType} Site</TableHead>
               <TableHead className="text-xs font-semibold">Min Utilization Target</TableHead>
+              <TableHead className="text-xs font-semibold">Current Utilization</TableHead>
+              <TableHead className="text-xs font-semibold">Status</TableHead>
               <TableHead className="text-xs font-semibold w-24">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, idx) => (
-              <TableRow key={row.id || `new-${idx}`}>
-                <TableCell>
-                  <Input value={row.dateRangeValue} onChange={e => handleChange(idx, "dateRangeValue", e.target.value)}
-                    placeholder={rangeType === "Weekly" ? "W1-May-2026" : "May-2026"} className="h-8 text-sm" />
-                </TableCell>
-                <TableCell>
-                  <Input value={row.siteName} onChange={e => handleChange(idx, "siteName", e.target.value)}
-                    placeholder="Site name" className="h-8 text-sm" />
-                </TableCell>
-                <TableCell>
-                  <Input type="number" min={0} step={1} value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
-                    placeholder="Blank = unconstrained" className="h-8 text-sm" />
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSave(idx)}>
-                      <Save className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => handleDelete(idx)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {data.map((row, idx) => {
+              const status = getStatus(row)
+              return (
+                <TableRow key={row.id || `new-${idx}`} className={cn(
+                  status === "below" ? "bg-red-50" : status === "near" ? "bg-amber-50" : ""
+                )}>
+                  <TableCell>
+                    <Input value={row.dateRangeValue} onChange={e => handleChange(idx, "dateRangeValue", e.target.value)}
+                      placeholder={rangeType === "Weekly" ? "W1-May-2026" : "May-2026"} className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Input value={row.siteName} onChange={e => handleChange(idx, "siteName", e.target.value)}
+                      placeholder="Site name" className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Input type="number" min={0} step={1} value={row.minUtilizationTarget ?? ""} onChange={e => handleChange(idx, "minUtilizationTarget", e.target.value ? Number(e.target.value) : null)}
+                      placeholder="Blank = unconstrained" className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
+                    <Input type="number" min={0} step={1} value={row.currentUtilization ?? ""} onChange={e => handleChange(idx, "currentUtilization", e.target.value ? Number(e.target.value) : null)}
+                      placeholder="0" className="h-8 text-sm" />
+                  </TableCell>
+                  <TableCell>
+                    {status === "met" ? (
+                      <Badge variant="success">On Target</Badge>
+                    ) : status === "near" ? (
+                      <Badge variant="warning">Near Target</Badge>
+                    ) : status === "below" ? (
+                      <Badge variant="destructive">Below Target</Badge>
+                    ) : (
+                      <Badge variant="secondary">No Target</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSave(idx)}>
+                        <Save className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => handleDelete(idx)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
             {data.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">No utilization targets set. Click &quot;Add Row&quot; to begin.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No utilization targets set. Click &quot;Add Row&quot; to begin.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

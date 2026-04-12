@@ -318,6 +318,7 @@ model UtilizationQueue {
   siteType             String
   siteName             String
   minUtilizationTarget Float?
+  currentUtilization   Float?
   maxAphReceipts       Int?
   currentAphReceipts   Int      @default(0)
   createdAt            DateTime @default(now())
