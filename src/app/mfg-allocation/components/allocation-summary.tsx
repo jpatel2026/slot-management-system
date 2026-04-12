@@ -35,8 +35,17 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
     const params = new URLSearchParams({ siteType })
     if (filters.selectedSite) params.set("siteId", filters.selectedSite)
     if (filters.selectedProduct) params.set("productCode", filters.selectedProduct)
-    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom)
-    if (filters.dateTo) params.set("dateTo", filters.dateTo)
+    // Expand date range to full week boundaries so partial weeks show complete data
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom)
+      from.setDate(from.getDate() - from.getDay()) // snap to Sunday (week start)
+      params.set("dateFrom", from.toISOString().split("T")[0])
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo)
+      to.setDate(to.getDate() + (6 - to.getDay())) // snap to Saturday (week end)
+      params.set("dateTo", to.toISOString().split("T")[0])
+    }
     if (filterType) params.set("capacityType", filterType)
     const res = await fetch(`/api/daily-capacity?${params}`)
     setData(await res.json())
