@@ -24,6 +24,36 @@ function parseDateRangeValue(v: string): number {
 const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 const fmtFull = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 
+function getDateRangeBounds(v: string): { start: Date; end: Date } | null {
+  if (!v) return null
+  const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
+  if (weekMatch) {
+    const weekNum = parseInt(weekMatch[1])
+    const monthStart = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
+    const start = new Date(monthStart)
+    start.setDate(start.getDate() + (weekNum - 1) * 7 - start.getDay())
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return { start, end }
+  }
+  const monthMatch = v.match(/(\w+)-(\d{4})/)
+  if (monthMatch) {
+    const start = new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`)
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0)
+    return { start, end }
+  }
+  return null
+}
+
+function rowMatchesDateFilter(dateRangeValue: string, dateFrom: string, dateTo: string): boolean {
+  if (!dateFrom && !dateTo) return true
+  const bounds = getDateRangeBounds(dateRangeValue)
+  if (!bounds) return true
+  const filterStart = dateFrom ? new Date(dateFrom) : new Date(0)
+  const filterEnd = dateTo ? new Date(dateTo) : new Date(9999, 11, 31)
+  return bounds.start <= filterEnd && bounds.end >= filterStart
+}
+
 function formatDateRange(v: string): string | null {
   if (!v) return null
   const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
@@ -134,7 +164,10 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[...data].sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue)).map((row, idx) => {
+            {[...data]
+              .filter(row => rowMatchesDateFilter(row.dateRangeValue, filters.dateFrom, filters.dateTo))
+              .sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue))
+              .map((row, idx) => {
               const atLimit = row.maxAphReceipts !== null && row.currentAphReceipts >= row.maxAphReceipts
               const nearLimit = row.maxAphReceipts !== null && row.currentAphReceipts >= (row.maxAphReceipts * 0.8)
               return (

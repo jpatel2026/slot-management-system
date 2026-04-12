@@ -25,6 +25,39 @@ function parseDateRangeValue(v: string): number {
 const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 const fmtFull = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 
+// Get the start and end Date of a dateRangeValue
+function getDateRangeBounds(v: string): { start: Date; end: Date } | null {
+  if (!v) return null
+  const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
+  if (weekMatch) {
+    const weekNum = parseInt(weekMatch[1])
+    const monthStart = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
+    const start = new Date(monthStart)
+    start.setDate(start.getDate() + (weekNum - 1) * 7 - start.getDay())
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return { start, end }
+  }
+  const monthMatch = v.match(/(\w+)-(\d{4})/)
+  if (monthMatch) {
+    const start = new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`)
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0)
+    return { start, end }
+  }
+  return null
+}
+
+// Check if a row's date range overlaps with the filter range (partial overlap = include)
+function rowMatchesDateFilter(dateRangeValue: string, dateFrom: string, dateTo: string): boolean {
+  if (!dateFrom && !dateTo) return true
+  const bounds = getDateRangeBounds(dateRangeValue)
+  if (!bounds) return true // can't parse → don't filter out
+  const filterStart = dateFrom ? new Date(dateFrom) : new Date(0)
+  const filterEnd = dateTo ? new Date(dateTo) : new Date(9999, 11, 31)
+  // Overlap: row starts before filter ends AND row ends after filter starts
+  return bounds.start <= filterEnd && bounds.end >= filterStart
+}
+
 // Convert "W1-May-2026" → "Apr 28 – May 4, 2026" or "May-2026" → "May 1 – May 31, 2026"
 function formatDateRange(v: string): string | null {
   if (!v) return null
@@ -148,7 +181,10 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[...data].sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue)).map((row, idx) => {
+            {[...data]
+              .filter(row => rowMatchesDateFilter(row.dateRangeValue, filters.dateFrom, filters.dateTo))
+              .sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue))
+              .map((row, idx) => {
               const status = getStatus(row)
               return (
                 <TableRow key={row.id || `new-${idx}`} className={cn(
