@@ -7,6 +7,23 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Plus, Save, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// Parse "W1-May-2026" or "May-2026" into a sortable timestamp
+function parseDateRangeValue(v: string): number {
+  if (!v) return 0
+  // Weekly: "W1-May-2026" → extract month-year, week number
+  const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
+  if (weekMatch) {
+    const d = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
+    return d.getTime() + (parseInt(weekMatch[1]) - 1) * 7 * 86400000
+  }
+  // Monthly: "May-2026" → first of month
+  const monthMatch = v.match(/(\w+)-(\d{4})/)
+  if (monthMatch) {
+    return new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`).getTime()
+  }
+  return 0
+}
+
 interface UtilTarget {
   id?: number
   dateRangeType: string
@@ -105,7 +122,7 @@ export function UtilizationTargets({ siteType, rangeType, filters }: { siteType:
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, idx) => {
+            {[...data].sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue)).map((row, idx) => {
               const status = getStatus(row)
               return (
                 <TableRow key={row.id || `new-${idx}`} className={cn(

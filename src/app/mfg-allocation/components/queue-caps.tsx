@@ -7,6 +7,20 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Plus, Save, Trash2, ShieldAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+function parseDateRangeValue(v: string): number {
+  if (!v) return 0
+  const weekMatch = v.match(/W(\d+)-(\w+)-(\d{4})/)
+  if (weekMatch) {
+    const d = new Date(`${weekMatch[2]} 1, ${weekMatch[3]}`)
+    return d.getTime() + (parseInt(weekMatch[1]) - 1) * 7 * 86400000
+  }
+  const monthMatch = v.match(/(\w+)-(\d{4})/)
+  if (monthMatch) {
+    return new Date(`${monthMatch[1]} 1, ${monthMatch[2]}`).getTime()
+  }
+  return 0
+}
+
 interface QueueRow {
   id?: number
   dateRangeType: string
@@ -93,7 +107,7 @@ export function QueueCaps({ filters }: { filters: AllocationFilters }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, idx) => {
+            {[...data].sort((a, b) => parseDateRangeValue(a.dateRangeValue) - parseDateRangeValue(b.dateRangeValue)).map((row, idx) => {
               const atLimit = row.maxAphReceipts !== null && row.currentAphReceipts >= row.maxAphReceipts
               const nearLimit = row.maxAphReceipts !== null && row.currentAphReceipts >= (row.maxAphReceipts * 0.8)
               return (
