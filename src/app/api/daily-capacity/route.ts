@@ -14,11 +14,14 @@ export async function GET(req: NextRequest) {
   const dateFrom = searchParams.get('dateFrom')
   const dateTo = searchParams.get('dateTo')
 
+  const productCode = searchParams.get('productCode')
+
   const where: Record<string, unknown> = {}
   if (siteId) where.siteId = parseInt(siteId)
   if (siteType) where.siteType = siteType
   if (capacityType) where.capacityType = capacityType
   if (mfgType) where.mfgType = mfgType
+  if (productCode) where.productCode = productCode
   if (dateFrom || dateTo) {
     const dateFilter: Record<string, string> = {}
     if (dateFrom) dateFilter.gte = dateFrom

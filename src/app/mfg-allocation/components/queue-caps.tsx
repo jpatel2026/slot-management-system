@@ -17,14 +17,26 @@ interface QueueRow {
   currentAphReceipts: number
 }
 
-export function QueueCaps() {
+interface AllocationFilters {
+  selectedSite: string; selectedProduct: string; dateFrom: string; dateTo: string
+}
+
+export function QueueCaps({ filters }: { filters: AllocationFilters }) {
   const [data, setData] = useState<QueueRow[]>([])
 
   const fetchData = useCallback(async () => {
-    const res = await fetch(`/api/utilization?siteType=Manufacturing&dateRangeType=Weekly`)
+    const params = new URLSearchParams({ siteType: "Manufacturing", dateRangeType: "Weekly" })
+    if (filters.selectedSite) {
+      const siteRes = await fetch(`/api/accounts/${filters.selectedSite}`)
+      if (siteRes.ok) {
+        const site = await siteRes.json()
+        params.set("siteName", site.name)
+      }
+    }
+    const res = await fetch(`/api/utilization?${params}`)
     const all = await res.json()
     setData(all.filter((r: QueueRow) => r.maxAphReceipts !== null || r.currentAphReceipts > 0))
-  }, [])
+  }, [filters])
 
   useEffect(() => { fetchData() }, [fetchData])
 

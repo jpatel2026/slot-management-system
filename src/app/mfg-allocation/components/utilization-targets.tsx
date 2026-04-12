@@ -17,14 +17,26 @@ interface UtilTarget {
   currentUtilization?: number | null
 }
 
-export function UtilizationTargets({ siteType, rangeType }: { siteType: string; rangeType: string }) {
+interface AllocationFilters {
+  selectedSite: string; selectedProduct: string; dateFrom: string; dateTo: string
+}
+
+export function UtilizationTargets({ siteType, rangeType, filters }: { siteType: string; rangeType: string; filters: AllocationFilters }) {
   const [data, setData] = useState<UtilTarget[]>([])
 
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType, dateRangeType: rangeType })
+    if (filters.selectedSite) {
+      // Look up site name for filtering
+      const siteRes = await fetch(`/api/accounts/${filters.selectedSite}`)
+      if (siteRes.ok) {
+        const site = await siteRes.json()
+        params.set("siteName", site.name)
+      }
+    }
     const res = await fetch(`/api/utilization?${params}`)
     setData(await res.json())
-  }, [siteType, rangeType])
+  }, [siteType, rangeType, filters])
 
   useEffect(() => { fetchData() }, [fetchData])
 

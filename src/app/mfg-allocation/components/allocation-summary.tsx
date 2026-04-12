@@ -23,31 +23,25 @@ interface WeekSummary {
   total: { base: number; booked: number; pct: number }
 }
 
-export function AllocationSummary({ siteType }: { siteType: string }) {
-  const [data, setData] = useState<DailyCapacity[]>([])
-  const [sites, setSites] = useState<{ id: number; name: string; alias: string }[]>([])
-  const [selectedSite, setSelectedSite] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
-  const [filterType, setFilterType] = useState("")
+interface AllocationFilters {
+  selectedSite: string; selectedProduct: string; dateFrom: string; dateTo: string
+}
 
-  const fetchSites = useCallback(async () => {
-    const res = await fetch(`/api/accounts?siteType=${siteType}&active=true`)
-    const s = await res.json()
-    setSites(s)
-  }, [siteType])
+export function AllocationSummary({ siteType, filters }: { siteType: string; filters: AllocationFilters }) {
+  const [data, setData] = useState<DailyCapacity[]>([])
+  const [filterType, setFilterType] = useState("")
 
   const fetchData = useCallback(async () => {
     const params = new URLSearchParams({ siteType })
-    if (selectedSite) params.set("siteId", selectedSite)
-    if (dateFrom) params.set("dateFrom", dateFrom)
-    if (dateTo) params.set("dateTo", dateTo)
+    if (filters.selectedSite) params.set("siteId", filters.selectedSite)
+    if (filters.selectedProduct) params.set("productCode", filters.selectedProduct)
+    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom)
+    if (filters.dateTo) params.set("dateTo", filters.dateTo)
     if (filterType) params.set("capacityType", filterType)
     const res = await fetch(`/api/daily-capacity?${params}`)
     setData(await res.json())
-  }, [siteType, selectedSite, dateFrom, dateTo, filterType])
+  }, [siteType, filters, filterType])
 
-  useEffect(() => { fetchSites() }, [fetchSites])
   useEffect(() => { fetchData() }, [fetchData])
 
   // Group by week for summary
@@ -154,22 +148,9 @@ export function AllocationSummary({ siteType }: { siteType: string }) {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 items-end flex-wrap rounded-xl border bg-white p-4 shadow-sm">
+      {/* Capacity Type filter (tab-local) */}
+      <div className="flex gap-3 items-end">
         <div className="min-w-[180px]">
-          <Label className="text-xs text-gray-500">{siteType} Site</Label>
-          <Select value={selectedSite} onChange={e => setSelectedSite(e.target.value)}
-            options={sites.map(s => ({ value: String(s.id), label: s.name }))} placeholder="All sites" />
-        </div>
-        <div>
-          <Label className="text-xs text-gray-500">From</Label>
-          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
-        </div>
-        <div>
-          <Label className="text-xs text-gray-500">To</Label>
-          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
-        </div>
-        <div className="min-w-[150px]">
           <Label className="text-xs text-gray-500">Capacity Type</Label>
           <Select value={filterType} onChange={e => setFilterType(e.target.value)}
             options={capacityTypes} placeholder="All types" />
