@@ -112,7 +112,6 @@ export function Sidebar() {
         </div>
         <div>
           <h1 className="text-sm font-bold text-white tracking-tight">Slot Manager</h1>
-          <p className="text-[10px] text-gray-500 font-medium tracking-wider uppercase">ATSM 2.0</p>
         </div>
         <Zap className="ml-auto h-3 w-3 text-green-400 animate-pulse" />
       </div>
