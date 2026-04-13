@@ -83,6 +83,7 @@ model Account {
   orderMfgSite      OrderReservation[] @relation("OrderMfgSite")
   orderWdcSite      OrderReservation[] @relation("OrderWdcSite")
   orderInfusionSite OrderReservation[] @relation("OrderInfusionSite")
+  optimizerConfigs  OptimizerPriorityConfig[]
 }
 
 // 3.4 LTM Configuration
@@ -381,4 +382,20 @@ model ScenarioOverride {
   @@unique([scenarioId, objectType, recordId, field])
   @@index([scenarioId, objectType])
   @@index([scenarioId, objectType, recordId])
+}
+
+// Schedule Optimizer Priority Configuration
+model OptimizerPriorityConfig {
+  id          Int      @id @default(autoincrement())
+  mfgSiteId   Int
+  productCode String
+  factor1     String   @default("Apheresis Completed")
+  factor2     String   @default("Aph Received at Manufacturing")
+  factor3     String   @default("Original PDD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  site        Account  @relation(fields: [mfgSiteId], references: [id])
+
+  @@unique([mfgSiteId, productCode])
 }

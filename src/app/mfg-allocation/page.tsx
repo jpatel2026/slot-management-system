@@ -10,6 +10,7 @@ import { AllocationSummary } from "./components/allocation-summary"
 import { UtilizationTargets } from "./components/utilization-targets"
 import { QueueCaps } from "./components/queue-caps"
 import { GenerateAllocations } from "./components/generate-allocations"
+import { ScheduleOptimizer } from "./components/schedule-optimizer"
 import { Filter, Search, X } from "lucide-react"
 
 export interface AllocationFilters {
@@ -93,12 +94,14 @@ export default function MfgAllocationPage() {
           <TabsTrigger value="weekly-util">Weekly Utilization</TabsTrigger>
           <TabsTrigger value="monthly-util">Monthly Utilization</TabsTrigger>
           <TabsTrigger value="queue">Queue Caps</TabsTrigger>
+          <TabsTrigger value="optimizer">Schedule Optimizer</TabsTrigger>
           <TabsTrigger value="generate">Generate Allocations</TabsTrigger>
         </TabsList>
         <TabsContent value="summary"><AllocationSummary siteType="Manufacturing" filters={applied} /></TabsContent>
         <TabsContent value="weekly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Weekly" filters={applied} /></TabsContent>
         <TabsContent value="monthly-util"><UtilizationTargets siteType="Manufacturing" rangeType="Monthly" filters={applied} /></TabsContent>
         <TabsContent value="queue"><QueueCaps filters={applied} /></TabsContent>
+        <TabsContent value="optimizer"><ScheduleOptimizer filters={applied} /></TabsContent>
         <TabsContent value="generate"><GenerateAllocations siteType="Manufacturing" /></TabsContent>
       </Tabs>
     </div>
