@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { cn, formatDate, utilizationColor, remainingColor } from "@/lib/utils"
-import { BarChart3, TrendingUp, AlertTriangle, Zap, Check, X } from "lucide-react"
+import { BarChart3, TrendingUp, AlertTriangle, Zap, Check, X, CalendarRange } from "lucide-react"
 
 interface DailyCapacity {
   id: number; name: string; date: string; capacityType: string; siteType: string
@@ -157,8 +157,36 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
   // Max base across weeks for bar chart scaling
   const maxWeekBase = Math.max(...weekSummaries.map(w => w.total.base), 1)
 
+  const hasDateFilter = filters.dateFrom || filters.dateTo
+  const hasSiteFilter = filters.selectedSite
+  const hasProductFilter = filters.selectedProduct
+  const hasAnyFilter = hasDateFilter || hasSiteFilter || hasProductFilter
+
   return (
     <div className="space-y-6">
+      {/* Active filter summary */}
+      {hasAnyFilter && (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-gray-400 font-medium">Showing data for:</span>
+          {hasDateFilter && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-blue-700 font-medium">
+              <CalendarRange className="h-3 w-3" />
+              {filters.dateFrom ? formatDate(filters.dateFrom) : "Start"} — {filters.dateTo ? formatDate(filters.dateTo) : "End"}
+            </span>
+          )}
+          {hasSiteFilter && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-purple-700 font-medium">
+              Site #{filters.selectedSite}
+            </span>
+          )}
+          {hasProductFilter && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-amber-700 font-medium">
+              {filters.selectedProduct}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── Hero KPIs with Ring Gauge ── */}
       <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 p-6 shadow-xl">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
