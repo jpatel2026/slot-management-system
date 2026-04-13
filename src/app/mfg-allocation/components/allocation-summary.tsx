@@ -117,47 +117,101 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
     ? [{ value: "Commercial", label: "Commercial" }, { value: "Clinical", label: "Clinical" }, { value: "Reserve", label: "Reserve" }, { value: "Non-patient", label: "Non-patient" }]
     : [{ value: "Patient", label: "Patient" }, { value: "Reserve", label: "Reserve" }, { value: "Non-patient", label: "Non-patient" }]
 
+  // Utilization ring gauge helpers
+  const ringSize = 100
+  const ringStroke = 10
+  const ringRadius = (ringSize - ringStroke) / 2
+  const ringCircumference = 2 * Math.PI * ringRadius
+  const ringOffset = ringCircumference - (Math.min(overallUtil, 100) / 100) * ringCircumference
+  const utilColor = overallUtil >= 96 ? "#22c55e" : overallUtil >= 80 ? "#f59e0b" : "#ef4444"
+
+  // Capacity type breakdown for donut
+  const typeBreakdown = isMfg
+    ? [
+        { label: "Commercial", value: data.filter(d => d.capacityType === "Commercial").reduce((s, d) => s + d.baseCapacity, 0), color: "#3b82f6" },
+        { label: "Clinical", value: data.filter(d => d.capacityType === "Clinical").reduce((s, d) => s + d.baseCapacity, 0), color: "#8b5cf6" },
+        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f59e0b" },
+        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#6b7280" },
+      ]
+    : [
+        { label: "Patient", value: data.filter(d => d.capacityType === "Patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#3b82f6" },
+        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f59e0b" },
+        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#6b7280" },
+      ]
+
+  // Helper to render a utilization bar cell
+  const UtilBar = ({ base, booked, pct, color }: { base: number; booked: number; pct: number; color: string }) => (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-bold" style={{ color }}>{pct}%</span>
+        <span className="text-[10px] text-gray-400">{booked}/{base}</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  )
+
+  const pctColor = (pct: number) => pct >= 96 ? "#22c55e" : pct >= 80 ? "#f59e0b" : pct >= 50 ? "#f97316" : "#ef4444"
+
+  // Max base across weeks for bar chart scaling
+  const maxWeekBase = Math.max(...weekSummaries.map(w => w.total.base), 1)
+
   return (
     <div className="space-y-6">
-      {/* KPI Tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border bg-white p-5 shadow-sm metric-card glow-blue">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="rounded-lg bg-blue-50 p-2"><BarChart3 className="h-4 w-4 text-blue-600" /></div>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Base</span>
+      {/* ── Hero KPIs with Ring Gauge ── */}
+      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 p-6 shadow-xl">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Ring gauge */}
+          <div className="flex flex-col items-center justify-center">
+            <svg width={ringSize} height={ringSize} className="transform -rotate-90">
+              <circle cx={ringSize/2} cy={ringSize/2} r={ringRadius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={ringStroke} />
+              <circle cx={ringSize/2} cy={ringSize/2} r={ringRadius} fill="none" stroke={utilColor} strokeWidth={ringStroke}
+                strokeDasharray={ringCircumference} strokeDashoffset={ringOffset} strokeLinecap="round"
+                className="transition-all duration-1000" />
+            </svg>
+            <div className="absolute flex flex-col items-center" style={{ marginTop: -8 }}>
+              <span className="text-2xl font-bold text-white">{overallUtil}%</span>
+              <span className="text-[9px] text-gray-400 uppercase tracking-widest">Utilization</span>
+            </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{grandTotal.base.toLocaleString()}</p>
-          <p className="text-xs text-gray-400 mt-1">{data.length} capacity records</p>
-        </div>
-        <div className="rounded-xl border bg-white p-5 shadow-sm metric-card glow-green">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="rounded-lg bg-green-50 p-2"><TrendingUp className="h-4 w-4 text-green-600" /></div>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Booked</span>
+
+          {/* KPI numbers */}
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total Base</span>
+            <span className="text-3xl font-bold text-white">{grandTotal.base.toLocaleString()}</span>
+            <span className="text-[10px] text-gray-500">{data.length} records</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{grandTotal.booked.toLocaleString()}</p>
-          <div className="mt-1 h-1.5 rounded-full bg-gray-100">
-            <div className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500" style={{ width: `${Math.min(overallUtil, 100)}%` }} />
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Booked</span>
+            <span className="text-3xl font-bold text-emerald-400">{grandTotal.booked.toLocaleString()}</span>
+            <div className="h-1.5 rounded-full bg-white/10 mt-1 w-24">
+              <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(overallUtil, 100)}%` }} />
+            </div>
           </div>
-        </div>
-        <div className="rounded-xl border bg-white p-5 shadow-sm metric-card glow-amber">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="rounded-lg bg-amber-50 p-2"><AlertTriangle className="h-4 w-4 text-amber-600" /></div>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Remaining</span>
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Remaining</span>
+            <span className="text-3xl font-bold text-amber-400">{grandTotal.remaining.toLocaleString()}</span>
+            <span className="text-[10px] text-gray-500">{grandTotal.base > 0 ? Math.round((grandTotal.remaining / grandTotal.base) * 100) : 0}% available</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{grandTotal.remaining.toLocaleString()}</p>
-        </div>
-        <div className="rounded-xl border bg-white p-5 shadow-sm metric-card glow-purple">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="rounded-lg bg-purple-50 p-2"><Zap className="h-4 w-4 text-purple-600" /></div>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilization</span>
+
+          {/* Capacity Mix mini chart */}
+          <div className="flex flex-col justify-center">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Capacity Mix</span>
+            <div className="space-y-1.5">
+              {typeBreakdown.filter(t => t.value > 0).map(t => (
+                <div key={t.label} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                  <span className="text-[10px] text-gray-400 flex-1">{t.label}</span>
+                  <span className="text-[10px] text-white font-medium">{t.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <p className={cn("text-3xl font-bold", overallUtil >= 96 ? "text-green-600" : overallUtil >= 91 ? "text-amber-600" : "text-red-600")}>
-            {overallUtil}%
-          </p>
         </div>
       </div>
 
-      {/* Capacity Type filter (tab-local) */}
+      {/* ── Capacity Type Filter ── */}
       <div className="flex gap-3 items-end">
         <div className="min-w-[180px]">
           <Label className="text-xs text-gray-500">Capacity Type</Label>
@@ -166,74 +220,121 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
         </div>
       </div>
 
-      {/* Weekly Utilization Heatmap */}
+      {/* ── Weekly Stacked Bar Chart + Utilization Table ── */}
       {weekSummaries.length > 0 && (
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b bg-gray-50/80">
-            <h3 className="text-sm font-semibold text-gray-700">Weekly Utilization Heatmap</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Visual bar chart */}
+          <div className="rounded-xl border bg-white shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-blue-500" /> Weekly Capacity Overview
+            </h3>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {weekSummaries.map(w => (
+                <div key={w.weekStart} className="group">
+                  <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-700">{w.week}</span>
+                      <span className="text-[10px] text-gray-400 ml-2">{w.weekStartDisplay} – {w.weekEnd}</span>
+                    </div>
+                    <span className="text-xs font-bold" style={{ color: pctColor(w.total.pct) }}>{w.total.pct}%</span>
+                  </div>
+                  {/* Stacked bar */}
+                  <div className="h-6 rounded-lg bg-gray-100 overflow-hidden flex relative">
+                    {(() => {
+                      const types = isMfg
+                        ? [{ d: w.commercial, color: "#3b82f6" }, { d: w.clinical, color: "#8b5cf6" }, { d: w.reserve, color: "#f59e0b" }, { d: w.nonPatient, color: "#6b7280" }]
+                        : [{ d: w.commercial, color: "#3b82f6" }, { d: w.reserve, color: "#f59e0b" }]
+                      return types.map((t, i) => (
+                        <div key={i} className="h-full transition-all duration-500 relative group/seg"
+                          style={{ width: `${(t.d.base / maxWeekBase) * 100}%`, backgroundColor: t.color, opacity: 0.25 }}>
+                          <div className="absolute inset-y-0 left-0 transition-all duration-500"
+                            style={{ width: `${t.d.pct}%`, backgroundColor: t.color }} />
+                        </div>
+                      ))
+                    })()}
+                    {/* Booked overlay text */}
+                    <div className="absolute inset-0 flex items-center px-2">
+                      <span className="text-[10px] font-bold text-white drop-shadow-sm">{w.total.booked} booked</span>
+                      <span className="text-[10px] text-white/60 ml-auto drop-shadow-sm">of {w.total.base}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-4 pt-3 border-t">
+              {typeBreakdown.filter(t => t.value > 0).map(t => (
+                <div key={t.label} className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: t.color }} />
+                  <span className="text-[10px] text-gray-500">{t.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead className="text-xs font-semibold">Week</TableHead>
-                  <TableHead className="text-xs font-semibold">{isMfg ? "Commercial" : "Patient"}</TableHead>
-                  {isMfg && <TableHead className="text-xs font-semibold">Clinical</TableHead>}
-                  {isMfg && <TableHead className="text-xs font-semibold">Non-Patient</TableHead>}
-                  <TableHead className="text-xs font-semibold">Reserve</TableHead>
-                  <TableHead className="text-xs font-semibold">Grand Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {weekSummaries.map((w) => (
-                  <TableRow key={w.weekStart}>
-                    <TableCell className="font-medium text-sm">
-                      <div>{w.week}</div>
-                      <div className="text-[10px] text-gray-400">{w.weekStartDisplay} – {w.weekEnd}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-medium heatmap-cell", utilizationColor(w.commercial.pct))}>
-                        {w.commercial.booked}/{w.commercial.base}
-                        <div className="text-[10px] font-normal">{w.commercial.pct}%</div>
-                      </div>
-                    </TableCell>
-                    {isMfg && (
-                      <TableCell>
-                        <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-medium heatmap-cell", utilizationColor(w.clinical.pct))}>
-                          {w.clinical.booked}/{w.clinical.base}
-                          <div className="text-[10px] font-normal">{w.clinical.pct}%</div>
-                        </div>
-                      </TableCell>
-                    )}
-                    {isMfg && (
-                      <TableCell>
-                        <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-medium heatmap-cell", utilizationColor(w.nonPatient.pct))}>
-                          {w.nonPatient.booked}/{w.nonPatient.base}
-                          <div className="text-[10px] font-normal">{w.nonPatient.pct}%</div>
-                        </div>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-medium heatmap-cell", utilizationColor(w.reserve.pct))}>
-                        {w.reserve.booked}/{w.reserve.base}
-                        <div className="text-[10px] font-normal">{w.reserve.pct}%</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className={cn("rounded-lg px-3 py-1.5 text-center text-sm font-bold heatmap-cell", utilizationColor(w.total.pct))}>
-                        {w.total.booked}/{w.total.base}
-                        <div className="text-[10px] font-normal">{w.total.pct}%</div>
-                      </div>
-                    </TableCell>
+
+          {/* Utilization progress table */}
+          <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b bg-gray-50/80">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-500" /> Weekly Utilization Breakdown
+              </h3>
+            </div>
+            <div className="max-h-[420px] overflow-y-auto">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
+                  <TableRow className="bg-gray-50/95">
+                    <TableHead className="text-xs font-semibold">Week</TableHead>
+                    <TableHead className="text-xs font-semibold">{isMfg ? "Commercial" : "Patient"}</TableHead>
+                    {isMfg && <TableHead className="text-xs font-semibold">Clinical</TableHead>}
+                    {isMfg && <TableHead className="text-xs font-semibold">Non-Patient</TableHead>}
+                    <TableHead className="text-xs font-semibold">Reserve</TableHead>
+                    <TableHead className="text-xs font-semibold">Total</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {weekSummaries.map(w => (
+                    <TableRow key={w.weekStart} className="hover:bg-gray-50/50">
+                      <TableCell className="align-top">
+                        <div className="font-semibold text-sm">{w.week}</div>
+                        <div className="text-[10px] text-gray-400">{w.weekStartDisplay}</div>
+                        <div className="text-[10px] text-gray-400">{w.weekEnd}</div>
+                      </TableCell>
+                      <TableCell className="min-w-[110px]">
+                        <UtilBar base={w.commercial.base} booked={w.commercial.booked} pct={w.commercial.pct} color="#3b82f6" />
+                      </TableCell>
+                      {isMfg && (
+                        <TableCell className="min-w-[110px]">
+                          <UtilBar base={w.clinical.base} booked={w.clinical.booked} pct={w.clinical.pct} color="#8b5cf6" />
+                        </TableCell>
+                      )}
+                      {isMfg && (
+                        <TableCell className="min-w-[110px]">
+                          <UtilBar base={w.nonPatient.base} booked={w.nonPatient.booked} pct={w.nonPatient.pct} color="#6b7280" />
+                        </TableCell>
+                      )}
+                      <TableCell className="min-w-[110px]">
+                        <UtilBar base={w.reserve.base} booked={w.reserve.booked} pct={w.reserve.pct} color="#f59e0b" />
+                      </TableCell>
+                      <TableCell className="min-w-[110px]">
+                        <UtilBar base={w.total.base} booked={w.total.booked} pct={w.total.pct} color={pctColor(w.total.pct)} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Detailed Daily View — Inline Editable */}
+      {weekSummaries.length === 0 && data.length === 0 && (
+        <div className="rounded-xl border bg-white p-12 text-center text-gray-400">
+          <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm">No capacity data found. Generate allocations or adjust filters.</p>
+        </div>
+      )}
+
+      {/* ── Daily Capacity Detail — Inline Editable ── */}
       <DailyCapacityDetail data={data} isMfg={isMfg} onRefresh={fetchData} />
     </div>
   )
@@ -320,6 +421,7 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
               <TableHead className="text-xs text-right">Booked</TableHead>
               {isMfg && <TableHead className="text-xs text-right">Over-alloc</TableHead>}
               <TableHead className="text-xs text-right">Remaining</TableHead>
+              <TableHead className="text-xs min-w-[100px]">Fill</TableHead>
               {isMfg && <TableHead className="text-xs">Mfgtype</TableHead>}
               <TableHead className="text-xs w-16"></TableHead>
             </TableRow>
@@ -385,6 +487,24 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
                     {remaining}
                   </TableCell>
 
+                  {/* Fill bar — visual booking progress */}
+                  <TableCell>
+                    {(() => {
+                      const base = isEditing ? editValues.baseCapacity : d.baseCapacity
+                      const booked = isEditing ? editValues.bookedCapacity : d.bookedCapacity
+                      const pct = base > 0 ? Math.min(Math.round((booked / base) * 100), 100) : 0
+                      const barColor = pct >= 96 ? "#22c55e" : pct >= 80 ? "#f59e0b" : pct >= 50 ? "#f97316" : "#ef4444"
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden min-w-[60px]">
+                            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                          </div>
+                          <span className="text-[10px] font-semibold w-8 text-right" style={{ color: barColor }}>{pct}%</span>
+                        </div>
+                      )
+                    })()}
+                  </TableCell>
+
                   {/* Mfgtype — editable (Mfg only) */}
                   {isMfg && (
                     <TableCell onClick={e => e.stopPropagation()}>
@@ -416,7 +536,7 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
               )
             })}
             {data.length === 0 && (
-              <TableRow><TableCell colSpan={isMfg ? 9 : 7} className="text-center py-8 text-gray-400">No capacity records found. Generate allocations first.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isMfg ? 10 : 8} className="text-center py-8 text-gray-400">No capacity records found. Generate allocations first.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
