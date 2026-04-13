@@ -470,11 +470,11 @@ async function main() {
     where: { siteType: 'Manufacturing', capacityType: 'Commercial', remainingCapacity: { gt: 0 }, siteId: sites['CABioMfg01'].id },
     orderBy: { date: 'asc' }, take: 100,
   })
-  // Intentionally skewed: 60% MfgEast, 25% MfgWest, 15% MfgCanada
+  // Intentionally skewed: MfgEast overloaded (~75% util), MfgWest+MfgCanada underloaded (~30-40%)
   const mfgCapRecords = [
-    ...mfgEastCaps.slice(0, 110),
-    ...mfgWestCaps.slice(0, 45),
-    ...mfgCanadaCaps.slice(0, 25),
+    ...mfgEastCaps.slice(0, 130),   // ~75% of MfgEast capacity used
+    ...mfgWestCaps.slice(0, 30),    // ~30% of MfgWest capacity used
+    ...mfgCanadaCaps.slice(0, 20),  // ~35% of MfgCanada capacity used
   ]
   const cryoCapRecords = await prisma.dailyCapacity.findMany({
     where: { siteType: 'Cryopreservation', capacityType: 'Patient', remainingCapacity: { gt: 0 } },
@@ -616,28 +616,31 @@ async function main() {
   for (const mfgKey of mfgSiteKeys) {
     const siteName = sites[mfgKey].name
     for (const pc of seedProductCodes) {
-      // Weekly util targets per product
+      // Weekly util targets per product — targets at 55-65%
       for (const w of weeks) {
+        // MfgEast gets higher current util, others get lower
+        const isOverloaded = mfgKey === 'USBioMfgE01'
         await prisma.utilizationQueue.create({
           data: {
             dateRangeType: 'Weekly', dateRangeValue: w,
             siteType: 'Manufacturing', siteName, productCode: pc,
-            minUtilizationTarget: randomInt(80, 95),
-            currentUtilization: randomInt(50, 100) as number,
+            minUtilizationTarget: randomInt(55, 65),
+            currentUtilization: isOverloaded ? randomInt(70, 85) : randomInt(25, 45),
             maxAphReceipts: randomInt(5, 12),
-            currentAphReceipts: randomInt(1, 10),
+            currentAphReceipts: isOverloaded ? randomInt(6, 11) : randomInt(1, 4),
           },
         })
         utilCount++
       }
-      // Monthly util targets per product
+      // Monthly util targets per product — targets at 55-65%
       for (const m of months) {
+        const isOverloaded = mfgKey === 'USBioMfgE01'
         await prisma.utilizationQueue.create({
           data: {
             dateRangeType: 'Monthly', dateRangeValue: m,
             siteType: 'Manufacturing', siteName, productCode: pc,
-            minUtilizationTarget: randomInt(85, 98),
-            currentUtilization: randomInt(60, 100) as number,
+            minUtilizationTarget: randomInt(55, 65),
+            currentUtilization: isOverloaded ? randomInt(70, 82) : randomInt(28, 48),
           },
         })
         utilCount++
@@ -653,8 +656,8 @@ async function main() {
           data: {
             dateRangeType: 'Weekly', dateRangeValue: w,
             siteType: 'Cryopreservation', siteName, productCode: pc,
-            minUtilizationTarget: randomInt(75, 92),
-            currentUtilization: randomInt(40, 95) as number,
+            minUtilizationTarget: randomInt(55, 65),
+            currentUtilization: randomInt(30, 70) as number,
           },
         })
         utilCount++

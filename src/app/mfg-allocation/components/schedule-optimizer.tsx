@@ -370,6 +370,15 @@ export function ScheduleOptimizer({ filters }: { filters: AllocationFilters }) {
             </div>
           )}
 
+          {/* Product — required, scopes all optimization to this product */}
+          <div className="rounded-xl border-2 border-blue-200 bg-blue-50/30 shadow-sm p-5">
+            <Label className="text-xs text-blue-600 uppercase tracking-wider font-semibold">Product (required)</Label>
+            <p className="text-[10px] text-gray-500 mt-0.5 mb-2">Optimization runs within a single product only</p>
+            <Select value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)}
+              options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
+              placeholder="Select product" />
+          </div>
+
           {/* Site Selection */}
           <div className="rounded-xl border bg-white shadow-sm p-5">
             <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">
@@ -398,15 +407,10 @@ export function ScheduleOptimizer({ filters }: { filters: AllocationFilters }) {
             )}
           </div>
 
-          {/* Product + Date Range */}
+          {/* Date Range */}
           <div className="rounded-xl border bg-white shadow-sm p-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs text-gray-500">Product</Label>
-                <Select value={selectedProduct} onChange={e => setSelectedProduct(e.target.value)}
-                  options={products.map(p => ({ value: p.code, label: `${p.name} (${p.code})` }))}
-                  placeholder="Select product" />
-              </div>
+            <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2 block">Date Range</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-gray-500 flex items-center gap-1"><Calendar className="h-3 w-3" /> From (today+2)</Label>
                 <Input type="date" value={dateFrom} min={minDate.toISOString().split("T")[0]}
