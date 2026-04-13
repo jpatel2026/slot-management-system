@@ -283,6 +283,16 @@ async function runDayByDay(input: OptimizerInput): Promise<OptimizerResult> {
 }
 
 // ──────────────────── MULTI-SITE MODE ────────────────────
+// Level-load across sites based on min utilization targets.
+// Logic:
+//   1. Get min utilization target per site from UtilizationQueue
+//   2. Get each order's primary site from SiteRelationship (mfgPreference)
+//   3. If primary site is below min target → move orders TO primary
+//   4. If primary is above target but other sites are below → move orders to secondary/tertiary
+//      (without dropping primary below its min target)
+//   5. If all sites meet min target → level-load by equalizing utilization % across sites
+//      (without dropping any site below its min target)
+
 async function runMultiSite(input: OptimizerInput): Promise<OptimizerResult> {
   const { siteIds, productCode, dateFrom, dateTo, factors, scenarioId } = input
   const { orders, capacitySlots } = await fetchOrdersAndCapacity(siteIds, productCode, dateFrom, dateTo, scenarioId)
@@ -290,91 +300,202 @@ async function runMultiSite(input: OptimizerInput): Promise<OptimizerResult> {
   const utilizationBefore = calcUtilization(capacitySlots)
   const moves: Move[] = []
 
-  // Calculate target utilization (average across all sites)
-  const totalBooked = Object.values(utilizationBefore).reduce((s, v) => s + v.booked, 0)
-  const totalBase = Object.values(utilizationBefore).reduce((s, v) => s + v.base, 0)
-  const targetPct = totalBase > 0 ? (totalBooked / totalBase) * 100 : 0
+  // Fetch min utilization targets per site
+  const utilTargets = await prisma.utilizationQueue.findMany({
+    where: {
+      siteType: 'Manufacturing',
+      productCode,
+      dateRangeType: 'Monthly',
+      minUtilizationTarget: { not: null },
+    },
+  })
+  const minTargetBySite = new Map<number, number>()
+  for (const sid of siteIds) {
+    // Find the best matching target for this site
+    const siteTargets = utilTargets.filter((t: any) => {
+      const siteUtil = Object.values(utilizationBefore).find(u => u.siteId === sid)
+      return siteUtil && t.siteName === siteUtil.siteName
+    })
+    const avgTarget = siteTargets.length > 0
+      ? siteTargets.reduce((s: number, t: any) => s + (t.minUtilizationTarget || 0), 0) / siteTargets.length
+      : 80 // default 80% if no target defined
+    minTargetBySite.set(sid, avgTarget)
+  }
 
-  // Sort orders by priority
-  const prioritized = sortByPriority(orders, factors)
+  // Fetch site relationships to determine primary/secondary/tertiary for each order's aph site
+  const relationships = await prisma.siteRelationship.findMany({
+    where: { active: true, mfgSiteId: { in: siteIds } },
+    include: { mfgSite: true },
+  })
 
-  // Group capacity by site
+  // For each order, determine its preferred site ranking (Primary > Secondary > Tertiary)
+  const PREF_ORDER = ['Primary', 'Secondary', 'Tertiary']
+  function getPreferredSites(order: any): number[] {
+    const rels = relationships
+      .filter((r: any) => r.aphSiteId === order.aphSiteId)
+      .filter((r: any) => siteIds.includes(r.mfgSiteId))
+      .sort((a: any, b: any) => PREF_ORDER.indexOf(a.mfgPreference) - PREF_ORDER.indexOf(b.mfgPreference))
+    return rels.map((r: any) => r.mfgSiteId)
+  }
+
+  // Group capacity by site with remaining-capacity tracking
   const capacityBySite = new Map<number, any[]>()
   for (const slot of capacitySlots) {
     if (!capacityBySite.has(slot.siteId)) capacityBySite.set(slot.siteId, [])
-    capacityBySite.get(slot.siteId)!.push(slot)
+    capacityBySite.get(slot.siteId)!.push({ ...slot, _remaining: slot.remainingCapacity })
   }
 
-  // Calculate how many orders each site should have to reach target utilization
-  const siteTargets = new Map<number, number>()
-  for (const [sid, slots] of capacityBySite) {
-    const siteBase = slots.reduce((s: number, sl: any) => s + sl.baseCapacity, 0)
-    const targetOrders = Math.round(siteBase * (targetPct / 100))
-    siteTargets.set(sid, targetOrders)
+  // Track simulated booked counts per site (for utilization calculation during moves)
+  const simBooked = new Map<number, number>()
+  const simBase = new Map<number, number>()
+  for (const [sid, util] of Object.entries(utilizationBefore)) {
+    simBooked.set(Number(sid), util.booked)
+    simBase.set(Number(sid), util.base)
   }
 
-  // Track how many orders currently assigned per site
-  const siteCurrentCount = new Map<number, number>()
+  const getSimPct = (sid: number) => {
+    const base = simBase.get(sid) || 0
+    return base > 0 ? ((simBooked.get(sid) || 0) / base) * 100 : 0
+  }
+
+  const getMinTarget = (sid: number) => minTargetBySite.get(sid) || 80
+
+  // Helper: can we remove an order from this site without going below min target?
+  const canRemoveFromSite = (sid: number) => {
+    const newBooked = (simBooked.get(sid) || 0) - 1
+    const base = simBase.get(sid) || 0
+    const newPct = base > 0 ? (newBooked / base) * 100 : 0
+    return newPct >= getMinTarget(sid)
+  }
+
+  // Helper: find nearest available slot at a target site
+  const findSlotAtSite = (targetSiteId: number, nearDate: Date): any | null => {
+    const slots = capacityBySite.get(targetSiteId) || []
+    return slots
+      .filter((s: any) => s._remaining > 0)
+      .sort((a: any, b: any) => {
+        const diffA = Math.abs(new Date(a.date).getTime() - nearDate.getTime())
+        const diffB = Math.abs(new Date(b.date).getTime() - nearDate.getTime())
+        return diffA - diffB
+      })[0] || null
+  }
+
+  // Helper: record a move
+  const recordMove = (order: any, fromSiteId: number, toSiteId: number, toSlot: any) => {
+    moves.push({
+      orderId: order.id,
+      orderName: order.id.slice(0, 12),
+      fromSlotId: order.mfgCapacityId,
+      fromSlotName: order.mfgCapacity?.name || '',
+      fromDate: order.mfgCapacity ? new Date(order.mfgCapacity.date).toISOString().split('T')[0] : '',
+      toSlotId: toSlot.id,
+      toSlotName: toSlot.name,
+      toDate: new Date(toSlot.date).toISOString().split('T')[0],
+      fromSiteId,
+      fromSiteName: order.mfgSite?.name || '',
+      toSiteId,
+      toSiteName: toSlot.site?.name || '',
+    })
+    // Update simulated counts
+    simBooked.set(fromSiteId, (simBooked.get(fromSiteId) || 0) - 1)
+    simBooked.set(toSiteId, (simBooked.get(toSiteId) || 0) + 1)
+    toSlot._remaining--
+  }
+
+  const prioritized = sortByPriority(orders, factors)
+
+  // ── PASS 1: Move orders to primary site if primary is below min target ──
   for (const order of prioritized) {
-    const sid = order.mfgSiteId
-    siteCurrentCount.set(sid, (siteCurrentCount.get(sid) || 0) + 1)
-  }
+    const preferred = getPreferredSites(order)
+    const primarySiteId = preferred[0]
+    if (!primarySiteId || primarySiteId === order.mfgSiteId) continue // already at primary
 
-  // Find over-utilized sites (more orders than target) and under-utilized sites
-  for (const order of prioritized) {
-    const currentSiteId = order.mfgSiteId
-    const currentCount = siteCurrentCount.get(currentSiteId) || 0
-    const currentTarget = siteTargets.get(currentSiteId) || 0
+    const primaryPct = getSimPct(primarySiteId)
+    const primaryTarget = getMinTarget(primarySiteId)
 
-    if (currentCount > currentTarget) {
-      // This site is over-utilized — try to move this order to an under-utilized site
-      for (const [targetSiteId, targetCount] of siteTargets) {
-        if (targetSiteId === currentSiteId) continue
-        const targetCurrentCount = siteCurrentCount.get(targetSiteId) || 0
-        if (targetCurrentCount < targetCount) {
-          // Find a slot at the target site near the same date
-          const currentDate = order.mfgCapacity ? new Date(order.mfgCapacity.date) : new Date()
-          const targetSlots = capacityBySite.get(targetSiteId) || []
-          const nearestSlot = targetSlots
-            .filter((s: any) => s.remainingCapacity > 0)
-            .sort((a: any, b: any) => {
-              const diffA = Math.abs(new Date(a.date).getTime() - currentDate.getTime())
-              const diffB = Math.abs(new Date(b.date).getTime() - currentDate.getTime())
-              return diffA - diffB
-            })[0]
-
-          if (nearestSlot) {
-            moves.push({
-              orderId: order.id,
-              orderName: order.id.slice(0, 12),
-              fromSlotId: order.mfgCapacityId,
-              fromSlotName: order.mfgCapacity?.name || '',
-              fromDate: order.mfgCapacity ? new Date(order.mfgCapacity.date).toISOString().split('T')[0] : '',
-              toSlotId: nearestSlot.id,
-              toSlotName: nearestSlot.name,
-              toDate: new Date(nearestSlot.date).toISOString().split('T')[0],
-              fromSiteId: currentSiteId,
-              fromSiteName: order.mfgSite?.name || '',
-              toSiteId: targetSiteId,
-              toSiteName: nearestSlot.site?.name || '',
-            })
-
-            // Update counts
-            siteCurrentCount.set(currentSiteId, currentCount - 1)
-            siteCurrentCount.set(targetSiteId, targetCurrentCount + 1)
-            break
-          }
+    if (primaryPct < primaryTarget) {
+      // Primary is below target — pull this order to primary if we can remove it from current
+      if (canRemoveFromSite(order.mfgSiteId)) {
+        const slot = findSlotAtSite(primarySiteId, new Date(order.mfgCapacity?.date || Date.now()))
+        if (slot) {
+          recordMove(order, order.mfgSiteId, primarySiteId, slot)
         }
       }
     }
   }
 
-  // Calculate after utilization (simulated)
-  const utilizationAfter = { ...utilizationBefore }
-  for (const [sid, util] of Object.entries(utilizationAfter)) {
-    const moved = moves.filter(m => m.toSiteId === Number(sid)).length - moves.filter(m => m.fromSiteId === Number(sid)).length
-    const newBooked = util.booked + moved
-    utilizationAfter[Number(sid)] = { ...util, booked: newBooked, pct: util.base > 0 ? Math.round((newBooked / util.base) * 100) : 0 }
+  // ── PASS 2: If primary is above target and other sites are below → move to secondary/tertiary ──
+  for (const order of prioritized) {
+    if (moves.find(m => m.orderId === order.id)) continue // already moved
+    const preferred = getPreferredSites(order)
+    const primarySiteId = preferred[0]
+    if (!primarySiteId || order.mfgSiteId !== primarySiteId) continue // only process orders AT primary
+
+    const primaryPct = getSimPct(primarySiteId)
+    const primaryTarget = getMinTarget(primarySiteId)
+
+    if (primaryPct <= primaryTarget) continue // primary still needs orders, don't move away
+
+    // Check secondary, tertiary sites
+    for (let i = 1; i < preferred.length; i++) {
+      const altSiteId = preferred[i]
+      const altPct = getSimPct(altSiteId)
+      const altTarget = getMinTarget(altSiteId)
+
+      if (altPct < altTarget && canRemoveFromSite(primarySiteId)) {
+        const slot = findSlotAtSite(altSiteId, new Date(order.mfgCapacity?.date || Date.now()))
+        if (slot) {
+          recordMove(order, primarySiteId, altSiteId, slot)
+          break
+        }
+      }
+    }
+  }
+
+  // ── PASS 3: All sites meet min target → level-load by equalizing utilization % ──
+  const allMeetTarget = siteIds.every(sid => getSimPct(sid) >= getMinTarget(sid))
+  if (allMeetTarget) {
+    // Calculate average utilization across all sites
+    const totalSimBooked = siteIds.reduce((s, sid) => s + (simBooked.get(sid) || 0), 0)
+    const totalSimBase = siteIds.reduce((s, sid) => s + (simBase.get(sid) || 0), 0)
+    const avgPct = totalSimBase > 0 ? (totalSimBooked / totalSimBase) * 100 : 0
+
+    // Move orders from highest-utilization sites to lowest, targeting avg pct
+    const unmoved = prioritized.filter(o => !moves.find(m => m.orderId === o.id))
+    for (const order of unmoved) {
+      const currentSiteId = order.mfgSiteId
+      const currentPct = getSimPct(currentSiteId)
+
+      if (currentPct <= avgPct) continue // this site is at or below average, skip
+
+      // Find the site with lowest utilization that's still above min target after receiving
+      const targetSite = siteIds
+        .filter(sid => sid !== currentSiteId)
+        .filter(sid => getSimPct(sid) < avgPct)
+        .sort((a, b) => getSimPct(a) - getSimPct(b))[0]
+
+      if (targetSite && canRemoveFromSite(currentSiteId)) {
+        const slot = findSlotAtSite(targetSite, new Date(order.mfgCapacity?.date || Date.now()))
+        if (slot) {
+          recordMove(order, currentSiteId, targetSite, slot)
+        }
+      }
+    }
+  }
+
+  // Calculate final utilization
+  const utilizationAfter: Record<number, { siteId: number; siteName: string; booked: number; base: number; pct: number; minTarget: number }> = {}
+  for (const sid of siteIds) {
+    const before = utilizationBefore[sid]
+    if (before) {
+      const booked = simBooked.get(sid) || 0
+      utilizationAfter[sid] = {
+        ...before,
+        booked,
+        pct: before.base > 0 ? Math.round((booked / before.base) * 100) : 0,
+        minTarget: getMinTarget(sid),
+      }
+    }
   }
 
   return {

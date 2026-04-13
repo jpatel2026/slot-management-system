@@ -456,12 +456,26 @@ async function main() {
   const cryoTypes: ('Central' | 'Local' | 'Manufacturing')[] = ['Central', 'Local', 'Manufacturing']
   const aphSiteKeys = ['USMoffit01', 'USMDAnderson01', 'USDanaFarber01', 'CAPrinMarg01', 'BRSirio01']
 
-  // Get Mfg capacity records for booking
-  const mfgCapRecords = await prisma.dailyCapacity.findMany({
-    where: { siteType: 'Manufacturing', capacityType: 'Commercial', remainingCapacity: { gt: 0 } },
-    orderBy: { date: 'asc' },
-    take: 500,
+  // Get Mfg capacity records for booking — bias towards MfgEast (overload it)
+  // Fetch per site so we can control distribution
+  const mfgEastCaps = await prisma.dailyCapacity.findMany({
+    where: { siteType: 'Manufacturing', capacityType: 'Commercial', remainingCapacity: { gt: 0 }, siteId: sites['USBioMfgE01'].id },
+    orderBy: { date: 'asc' }, take: 300,
   })
+  const mfgWestCaps = await prisma.dailyCapacity.findMany({
+    where: { siteType: 'Manufacturing', capacityType: 'Commercial', remainingCapacity: { gt: 0 }, siteId: sites['USBioMfgW01'].id },
+    orderBy: { date: 'asc' }, take: 200,
+  })
+  const mfgCanadaCaps = await prisma.dailyCapacity.findMany({
+    where: { siteType: 'Manufacturing', capacityType: 'Commercial', remainingCapacity: { gt: 0 }, siteId: sites['CABioMfg01'].id },
+    orderBy: { date: 'asc' }, take: 100,
+  })
+  // Intentionally skewed: 60% MfgEast, 25% MfgWest, 15% MfgCanada
+  const mfgCapRecords = [
+    ...mfgEastCaps.slice(0, 110),
+    ...mfgWestCaps.slice(0, 45),
+    ...mfgCanadaCaps.slice(0, 25),
+  ]
   const cryoCapRecords = await prisma.dailyCapacity.findMany({
     where: { siteType: 'Cryopreservation', capacityType: 'Patient', remainingCapacity: { gt: 0 } },
     orderBy: { date: 'asc' },
