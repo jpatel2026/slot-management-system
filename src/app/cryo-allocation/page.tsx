@@ -33,15 +33,15 @@ export default function CryoAllocationPage() {
   return (
     <div>
       <PageHeader
-        title="Cryopreservation Allocation"
+        title="Cryo Capacity Management"
         description="Manage cryopreservation capacity and generate daily slot allocations"
       />
 
-      {/* Global Filters */}
-      <div className="flex gap-3 items-end flex-wrap rounded-xl border bg-white p-4 shadow-sm mb-4">
-        <Filter className="h-4 w-4 text-gray-400 shrink-0 mb-2" />
+      {/* Global Filters — SLDS filter bar */}
+      <div className="flex gap-3 items-end flex-wrap rounded border border-[#DDDBDA] bg-white px-4 py-3 shadow-sm mb-4">
+        <Filter className="h-4 w-4 text-[#706E6B] shrink-0 mb-2" />
         <div className="min-w-[200px]">
-          <Label className="text-xs text-gray-500">Cryopreservation Site</Label>
+          <Label className="text-[11px] font-medium text-[#3E3E3C] mb-1 block">Cryopreservation Site</Label>
           <Select
             value={draft.selectedSite}
             onChange={e => setDraft(f => ({ ...f, selectedSite: e.target.value }))}
@@ -50,7 +50,7 @@ export default function CryoAllocationPage() {
           />
         </div>
         <div className="min-w-[180px]">
-          <Label className="text-xs text-gray-500">Product</Label>
+          <Label className="text-[11px] font-medium text-[#3E3E3C] mb-1 block">Product</Label>
           <Select
             value={draft.selectedProduct}
             onChange={e => setDraft(f => ({ ...f, selectedProduct: e.target.value }))}
@@ -59,22 +59,22 @@ export default function CryoAllocationPage() {
           />
         </div>
         <div>
-          <Label className="text-xs text-gray-500">From</Label>
+          <Label className="text-[11px] font-medium text-[#3E3E3C] mb-1 block">From</Label>
           <Input type="date" value={draft.dateFrom} onChange={e => setDraft(f => ({ ...f, dateFrom: e.target.value }))} className="w-40" />
         </div>
         <div>
-          <Label className="text-xs text-gray-500">To</Label>
+          <Label className="text-[11px] font-medium text-[#3E3E3C] mb-1 block">To</Label>
           <Input type="date" value={draft.dateTo} onChange={e => setDraft(f => ({ ...f, dateTo: e.target.value }))} className="w-40" />
         </div>
-        <Button onClick={handleApply} className={draftChanged
-          ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/20"
-          : "bg-gray-900 hover:bg-gray-800"
-        }>
+        <Button
+          onClick={handleApply}
+          className={draftChanged ? "bg-[#0176D3] hover:bg-[#014486] text-white" : "bg-[#706E6B] hover:bg-[#444444] text-white"}
+        >
           <Search className="h-3.5 w-3.5 mr-1.5" />
           Apply Filters
         </Button>
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={handleClear} className="text-gray-500 hover:text-red-600">
+          <Button variant="ghost" size="sm" onClick={handleClear} className="text-[#706E6B] hover:text-[#C23934]">
             <X className="h-3.5 w-3.5 mr-1" /> Clear
           </Button>
         )}

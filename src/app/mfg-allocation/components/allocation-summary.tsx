@@ -128,15 +128,15 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
   // Capacity type breakdown for donut
   const typeBreakdown = isMfg
     ? [
-        { label: "Commercial", value: data.filter(d => d.capacityType === "Commercial").reduce((s, d) => s + d.baseCapacity, 0), color: "#3b82f6" },
-        { label: "Clinical", value: data.filter(d => d.capacityType === "Clinical").reduce((s, d) => s + d.baseCapacity, 0), color: "#8b5cf6" },
-        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f59e0b" },
-        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#6b7280" },
+        { label: "Commercial", value: data.filter(d => d.capacityType === "Commercial").reduce((s, d) => s + d.baseCapacity, 0), color: "#0ea5e9" },
+        { label: "Clinical", value: data.filter(d => d.capacityType === "Clinical").reduce((s, d) => s + d.baseCapacity, 0), color: "#d946ef" },
+        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f97316" },
+        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#14b8a6" },
       ]
     : [
-        { label: "Patient", value: data.filter(d => d.capacityType === "Patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#3b82f6" },
-        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f59e0b" },
-        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#6b7280" },
+        { label: "Patient", value: data.filter(d => d.capacityType === "Patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#0ea5e9" },
+        { label: "Reserve", value: data.filter(d => d.capacityType === "Reserve").reduce((s, d) => s + d.baseCapacity, 0), color: "#f97316" },
+        { label: "Non-patient", value: data.filter(d => d.capacityType === "Non-patient").reduce((s, d) => s + d.baseCapacity, 0), color: "#14b8a6" },
       ]
 
   // Helper to render a utilization bar cell
@@ -164,77 +164,78 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
 
   return (
     <div className="space-y-6">
-      {/* Active filter summary */}
+      {/* Active filter pills */}
       {hasAnyFilter && (
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="text-gray-400 font-medium">Showing data for:</span>
+          <span className="text-[#706E6B] font-medium">Filtered by:</span>
           {hasDateFilter && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-blue-700 font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EBF4FF] border border-[#0176D3]/20 px-2.5 py-0.5 text-[#0176D3] font-medium">
               <CalendarRange className="h-3 w-3" />
               {filters.dateFrom ? formatDate(filters.dateFrom) : "Start"} — {filters.dateTo ? formatDate(filters.dateTo) : "End"}
             </span>
           )}
           {hasSiteFilter && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-purple-700 font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EBF4FF] border border-[#0176D3]/20 px-2.5 py-0.5 text-[#0176D3] font-medium">
               Site #{filters.selectedSite}
             </span>
           )}
           {hasProductFilter && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-amber-700 font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EBF4FF] border border-[#0176D3]/20 px-2.5 py-0.5 text-[#0176D3] font-medium">
               {filters.selectedProduct}
             </span>
           )}
         </div>
       )}
 
-      {/* ── Hero KPIs with Ring Gauge ── */}
-      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 p-6 shadow-xl">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Ring gauge */}
-          <div className="flex flex-col items-center justify-center">
-            <svg width={ringSize} height={ringSize} className="transform -rotate-90">
-              <circle cx={ringSize/2} cy={ringSize/2} r={ringRadius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={ringStroke} />
-              <circle cx={ringSize/2} cy={ringSize/2} r={ringRadius} fill="none" stroke={utilColor} strokeWidth={ringStroke}
-                strokeDasharray={ringCircumference} strokeDashoffset={ringOffset} strokeLinecap="round"
-                className="transition-all duration-1000" />
-            </svg>
-            <div className="absolute flex flex-col items-center" style={{ marginTop: -8 }}>
-              <span className="text-2xl font-bold text-white">{overallUtil}%</span>
-              <span className="text-[9px] text-gray-400 uppercase tracking-widest">Utilization</span>
-            </div>
+      {/* ── SLDS KPI Stat Tiles ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {/* Overall Utilization tile */}
+        <div className="rounded border border-[#DDDBDA] bg-white p-4 shadow-sm metric-card col-span-1">
+          <p className="text-[11px] font-semibold text-[#706E6B] uppercase tracking-wider mb-2">Overall Utilization</p>
+          <div className="flex items-end gap-2 mb-2">
+            <span className="text-3xl font-bold" style={{ color: utilColor }}>{overallUtil}%</span>
           </div>
+          <div className="h-2 rounded-full bg-[#F3F3F3] overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${Math.min(overallUtil, 100)}%`, backgroundColor: utilColor }} />
+          </div>
+          <p className="text-[10px] text-[#706E6B] mt-1">{data.length} records</p>
+        </div>
 
-          {/* KPI numbers */}
-          <div className="flex flex-col justify-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total Base</span>
-            <span className="text-3xl font-bold text-white">{grandTotal.base.toLocaleString()}</span>
-            <span className="text-[10px] text-gray-500">{data.length} records</span>
-          </div>
-          <div className="flex flex-col justify-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Booked</span>
-            <span className="text-3xl font-bold text-emerald-400">{grandTotal.booked.toLocaleString()}</span>
-            <div className="h-1.5 rounded-full bg-white/10 mt-1 w-24">
-              <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(overallUtil, 100)}%` }} />
-            </div>
-          </div>
-          <div className="flex flex-col justify-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Remaining</span>
-            <span className="text-3xl font-bold text-amber-400">{grandTotal.remaining.toLocaleString()}</span>
-            <span className="text-[10px] text-gray-500">{grandTotal.base > 0 ? Math.round((grandTotal.remaining / grandTotal.base) * 100) : 0}% available</span>
-          </div>
+        {/* Base Capacity */}
+        <div className="rounded border border-[#DDDBDA] bg-white p-4 shadow-sm metric-card">
+          <p className="text-[11px] font-semibold text-[#706E6B] uppercase tracking-wider mb-1">Total Base</p>
+          <p className="text-3xl font-bold text-[#181818]">{grandTotal.base.toLocaleString()}</p>
+          <p className="text-[11px] text-[#706E6B] mt-1">Configured capacity</p>
+        </div>
 
-          {/* Capacity Mix mini chart */}
-          <div className="flex flex-col justify-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Capacity Mix</span>
-            <div className="space-y-1.5">
-              {typeBreakdown.filter(t => t.value > 0).map(t => (
-                <div key={t.label} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                  <span className="text-[10px] text-gray-400 flex-1">{t.label}</span>
-                  <span className="text-[10px] text-white font-medium">{t.value}</span>
-                </div>
-              ))}
-            </div>
+        {/* Booked */}
+        <div className="rounded border border-[#0176D3]/30 bg-[#EBF4FF] p-4 shadow-sm metric-card">
+          <p className="text-[11px] font-semibold text-[#0176D3] uppercase tracking-wider mb-1">Booked</p>
+          <p className="text-3xl font-bold text-[#0176D3]">{grandTotal.booked.toLocaleString()}</p>
+          <p className="text-[11px] text-[#0176D3]/70 mt-1">{overallUtil}% of base</p>
+        </div>
+
+        {/* Remaining */}
+        <div className="rounded border border-[#DDDBDA] bg-white p-4 shadow-sm metric-card">
+          <p className="text-[11px] font-semibold text-[#706E6B] uppercase tracking-wider mb-1">Remaining</p>
+          <p className="text-3xl font-bold text-[#2E844A]">{grandTotal.remaining.toLocaleString()}</p>
+          <p className="text-[11px] text-[#706E6B] mt-1">
+            {grandTotal.base > 0 ? Math.round((grandTotal.remaining / grandTotal.base) * 100) : 0}% available
+          </p>
+        </div>
+
+        {/* Capacity Mix */}
+        <div className="rounded border border-[#DDDBDA] bg-white p-4 shadow-sm metric-card">
+          <p className="text-[11px] font-semibold text-[#706E6B] uppercase tracking-wider mb-2">Capacity Mix</p>
+          <div className="space-y-1.5">
+            {typeBreakdown.filter(t => t.value > 0).map(t => (
+              <div key={t.label} className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: t.color }} />
+                <span className="text-[11px] text-[#444444] flex-1 truncate">{t.label}</span>
+                <span className="text-[11px] font-semibold text-[#181818]">{t.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -242,7 +243,7 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
       {/* ── Capacity Type Filter ── */}
       <div className="flex gap-3 items-end">
         <div className="min-w-[180px]">
-          <Label className="text-xs text-gray-500">Capacity Type</Label>
+          <Label className="text-[11px] font-medium text-[#3E3E3C] mb-1 block">Capacity Type</Label>
           <Select value={filterType} onChange={e => setFilterType(e.target.value)}
             options={capacityTypes} placeholder="All types" />
         </div>
@@ -252,9 +253,9 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
       {weekSummaries.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Visual bar chart */}
-          <div className="rounded-xl border bg-white shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-500" /> Weekly Capacity Overview
+          <div className="rounded border border-[#DDDBDA] bg-white shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-[#181818] mb-4 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-[#0176D3]" /> Weekly Capacity Overview
             </h3>
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {weekSummaries.map(w => (
@@ -270,8 +271,8 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
                   <div className="h-6 rounded-lg bg-gray-100 overflow-hidden flex relative">
                     {(() => {
                       const types = isMfg
-                        ? [{ d: w.commercial, color: "#3b82f6" }, { d: w.clinical, color: "#8b5cf6" }, { d: w.reserve, color: "#f59e0b" }, { d: w.nonPatient, color: "#6b7280" }]
-                        : [{ d: w.commercial, color: "#3b82f6" }, { d: w.reserve, color: "#f59e0b" }]
+                        ? [{ d: w.commercial, color: "#0ea5e9" }, { d: w.clinical, color: "#d946ef" }, { d: w.reserve, color: "#f97316" }, { d: w.nonPatient, color: "#14b8a6" }]
+                        : [{ d: w.commercial, color: "#0ea5e9" }, { d: w.reserve, color: "#f97316" }]
                       return types.map((t, i) => (
                         <div key={i} className="h-full transition-all duration-500 relative group/seg"
                           style={{ width: `${(t.d.base / maxWeekBase) * 100}%`, backgroundColor: t.color, opacity: 0.25 }}>
@@ -301,10 +302,10 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
           </div>
 
           {/* Utilization progress table */}
-          <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b bg-gray-50/80">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" /> Weekly Utilization Breakdown
+          <div className="rounded border border-[#DDDBDA] bg-white shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#DDDBDA] bg-[#FAFAF9]">
+              <h3 className="text-sm font-semibold text-[#181818] flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-[#2E844A]" /> Weekly Utilization Breakdown
               </h3>
             </div>
             <div className="max-h-[420px] overflow-y-auto">
@@ -328,20 +329,20 @@ export function AllocationSummary({ siteType, filters }: { siteType: string; fil
                         <div className="text-[10px] text-gray-400">{w.weekEnd}</div>
                       </TableCell>
                       <TableCell className="min-w-[110px]">
-                        <UtilBar base={w.commercial.base} booked={w.commercial.booked} pct={w.commercial.pct} color="#3b82f6" />
+                        <UtilBar base={w.commercial.base} booked={w.commercial.booked} pct={w.commercial.pct} color="#0ea5e9" />
                       </TableCell>
                       {isMfg && (
                         <TableCell className="min-w-[110px]">
-                          <UtilBar base={w.clinical.base} booked={w.clinical.booked} pct={w.clinical.pct} color="#8b5cf6" />
+                          <UtilBar base={w.clinical.base} booked={w.clinical.booked} pct={w.clinical.pct} color="#d946ef" />
                         </TableCell>
                       )}
                       {isMfg && (
                         <TableCell className="min-w-[110px]">
-                          <UtilBar base={w.nonPatient.base} booked={w.nonPatient.booked} pct={w.nonPatient.pct} color="#6b7280" />
+                          <UtilBar base={w.nonPatient.base} booked={w.nonPatient.booked} pct={w.nonPatient.pct} color="#14b8a6" />
                         </TableCell>
                       )}
                       <TableCell className="min-w-[110px]">
-                        <UtilBar base={w.reserve.base} booked={w.reserve.booked} pct={w.reserve.pct} color="#f59e0b" />
+                        <UtilBar base={w.reserve.base} booked={w.reserve.booked} pct={w.reserve.pct} color="#f97316" />
                       </TableCell>
                       <TableCell className="min-w-[110px]">
                         <UtilBar base={w.total.base} booked={w.total.booked} pct={w.total.pct} color={pctColor(w.total.pct)} />
@@ -433,10 +434,10 @@ function DailyCapacityDetail({ data, isMfg, onRefresh }: { data: DailyCapacity[]
   const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   return (
-    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b bg-gray-50/80">
-        <h3 className="text-sm font-semibold text-gray-700">Daily Capacity Detail</h3>
-        <p className="text-[10px] text-gray-400">{data.length} records &middot; click a row to edit Base, Booked, Over-alloc, or Mfgtype</p>
+    <div className="rounded border border-[#DDDBDA] bg-white shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#DDDBDA] bg-[#FAFAF9]">
+        <h3 className="text-sm font-semibold text-[#181818]">Daily Capacity Detail</h3>
+        <p className="text-[11px] text-[#706E6B]">{data.length} records · click a row to edit Base, Booked, Over-alloc, or Mfgtype</p>
       </div>
       <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
         <Table>

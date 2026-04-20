@@ -7,18 +7,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { ChevronDown, ChevronUp, ChevronsUpDown, Download, ExternalLink, Filter } from "lucide-react"
+import { ChevronDown, ChevronUp, ChevronsUpDown, Download, ExternalLink, Filter, Pencil } from "lucide-react"
 import { cn, formatDate, exportToCSV } from "@/lib/utils"
+import { CapacityCalendarPicker } from "./capacity-calendar-picker"
 
 interface Order {
   id: string; status: string; country: string; therapyType: string; cryoType: string
+  mfgSiteId: number; cryoSiteId?: number | null
   product: { name: string; code: string; mfgType: string }
   mfgSite: { name: string; alias: string }
   cryoSite?: { name: string } | null
-  mfgCapacity: { name: string; date: string; mfgType: string | null }
-  cryoCapacity?: { name: string; date: string } | null
+  mfgCapacity: { id: number; name: string; date: string; mfgType: string | null }
+  cryoCapacity?: { id: number; name: string; date: string } | null
   plannedPdd: string
   milestones: Array<{ milestoneName: string; plannedDate: string; actualDate: string | null; sequentialLeg: number }>
+}
+
+interface CapPicker {
+  orderId: string
+  mode: "mfg" | "cryo"
+  currentSlotId?: number | null
+  currentSiteId?: number | null
+  currentSlotDate?: string | null
+  currentSlotName?: string | null
 }
 
 const statusColors: Record<string, string> = {
@@ -71,6 +82,7 @@ export function OrderGrid() {
   })
   const [sortKey, setSortKey] = useState<SortKey>("mfgId")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
+  const [capPicker, setCapPicker] = useState<CapPicker | null>(null)
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
@@ -242,15 +254,67 @@ export function OrderGrid() {
                   </TableCell>
                   <TableCell className="text-sm">{getMilestoneDate(order, "Apheresis Picked Up")}</TableCell>
                   <TableCell><span className="text-sm">{order.cryoType}</span></TableCell>
+                  {/* Cryo ID — link + edit */}
                   <TableCell>
                     {order.cryoCapacity ? (
-                      <span className="font-mono text-xs text-purple-600">{order.cryoCapacity.name}</span>
-                    ) : "—"}
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href="/master-data/daily-capacity"
+                          className="font-mono text-xs text-purple-600 hover:text-purple-800 hover:underline"
+                          title="View capacity record"
+                        >
+                          {order.cryoCapacity.name}
+                        </Link>
+                        <button
+                          onClick={() => setCapPicker({
+                            orderId: order.id, mode: "cryo",
+                            currentSlotId: order.cryoCapacity?.id,
+                            currentSiteId: order.cryoSiteId,
+                            currentSlotDate: order.cryoCapacity?.date,
+                            currentSlotName: order.cryoCapacity?.name,
+                          })}
+                          className="rounded p-0.5 text-[#706E6B] hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                          title="Change cryo slot"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setCapPicker({ orderId: order.id, mode: "cryo", currentSiteId: order.cryoSiteId })}
+                        className="text-xs text-[#706E6B] hover:text-purple-600 underline decoration-dotted transition-colors"
+                        title="Assign cryo slot"
+                      >
+                        Assign
+                      </button>
+                    )}
                   </TableCell>
+                  {/* Mfg ID — link + edit */}
                   <TableCell>
-                    <div>
-                      <span className="font-mono text-xs text-blue-600">{order.mfgCapacity?.name}</span>
-                      <div className="text-[10px] text-gray-400">{order.mfgCapacity?.date ? formatDate(order.mfgCapacity.date) : ""}</div>
+                    <div className="flex items-start gap-1.5">
+                      <div>
+                        <Link
+                          href="/master-data/daily-capacity"
+                          className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline block"
+                          title="View capacity record"
+                        >
+                          {order.mfgCapacity?.name}
+                        </Link>
+                        <div className="text-[10px] text-gray-400">{order.mfgCapacity?.date ? formatDate(order.mfgCapacity.date) : ""}</div>
+                      </div>
+                      <button
+                        onClick={() => setCapPicker({
+                          orderId: order.id, mode: "mfg",
+                          currentSlotId: order.mfgCapacity?.id,
+                          currentSiteId: order.mfgSiteId,
+                          currentSlotDate: order.mfgCapacity?.date,
+                          currentSlotName: order.mfgCapacity?.name,
+                        })}
+                        className="rounded p-0.5 text-[#706E6B] hover:text-blue-600 hover:bg-blue-50 transition-colors mt-0.5 shrink-0"
+                        title="Change mfg slot"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{getMilestoneDate(order, "FP Released")}</TableCell>
@@ -267,6 +331,20 @@ export function OrderGrid() {
           </Table>
         </div>
       </div>
+
+      {/* Capacity Calendar Picker */}
+      {capPicker && (
+        <CapacityCalendarPicker
+          orderId={capPicker.orderId}
+          mode={capPicker.mode}
+          currentSlotId={capPicker.currentSlotId}
+          currentSiteId={capPicker.currentSiteId}
+          currentSlotDate={capPicker.currentSlotDate}
+          currentSlotName={capPicker.currentSlotName}
+          onClose={() => setCapPicker(null)}
+          onApplied={() => { setCapPicker(null); fetchOrders() }}
+        />
+      )}
     </div>
   )
 }
