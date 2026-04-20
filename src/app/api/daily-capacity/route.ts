@@ -23,15 +23,24 @@ export async function GET(req: NextRequest) {
   if (mfgType) where.mfgType = mfgType
   if (productCode) where.productCode = productCode
   if (dateFrom || dateTo) {
-    const dateFilter: Record<string, string> = {}
-    if (dateFrom) dateFilter.gte = dateFrom
-    if (dateTo) dateFilter.lte = dateTo
+    // Always use proper Date objects (never raw strings) so Prisma doesn't throw
+    // a DateTime validation error. Append explicit UTC suffix so the conversion
+    // is timezone-agnostic on both client and server.
+    const dateFilter: Record<string, Date> = {}
+    if (dateFrom) dateFilter.gte = new Date(dateFrom + 'T00:00:00.000Z')
+    if (dateTo)   dateFilter.lte = new Date(dateTo   + 'T23:59:59.999Z')
     where.date = dateFilter
   }
 
-  const capacities = await db.dailyCapacity.findMany({
-    where,
-    orderBy: { date: 'asc' },
-  })
-  return NextResponse.json(capacities)
+  try {
+    const capacities = await db.dailyCapacity.findMany({
+      where,
+      orderBy: { date: 'asc' },
+    })
+    return NextResponse.json(capacities)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[daily-capacity GET]', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

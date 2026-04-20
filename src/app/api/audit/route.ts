@@ -15,9 +15,9 @@ export async function GET(req: NextRequest) {
   if (recordId) where.recordId = recordId
   if (userId) where.userId = userId
   if (dateFrom || dateTo) {
-    const dateFilter: Record<string, string> = {}
-    if (dateFrom) dateFilter.gte = dateFrom
-    if (dateTo) dateFilter.lte = dateTo
+    const dateFilter: Record<string, Date> = {}
+    if (dateFrom) dateFilter.gte = new Date(dateFrom + 'T00:00:00.000Z')
+    if (dateTo)   dateFilter.lte = new Date(dateTo   + 'T23:59:59.999Z')
     where.timestamp = dateFilter
   }
 

@@ -69,6 +69,7 @@ export function CapacityCalendarPicker({
   const [mfgTypeFilter, setMfgType]     = useState<string>("")
   const [slots, setSlots]               = useState<CapSlot[]>([])
   const [loading, setLoading]           = useState(false)
+  const [loadError, setLoadError]       = useState<string | null>(null)
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState<string | null>(null)
   const [viewDate, setViewDate]         = useState(defaultViewDate)
@@ -93,10 +94,19 @@ export function CapacityCalendarPicker({
     if (capType)        p.set("capacityType", capType)
     if (productCode)    p.set("productCode", productCode)
     if (mfgTypeFilter)  p.set("mfgType", mfgTypeFilter)
+    setLoadError(null)
     fetch(`/api/daily-capacity?${p}`)
       .then(r => r.json())
-      .then(d => { setSlots(Array.isArray(d) ? d : []); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(d => {
+        if (Array.isArray(d)) {
+          setSlots(d)
+        } else {
+          setSlots([])
+          setLoadError(d?.error ?? 'Failed to load capacity data')
+        }
+        setLoading(false)
+      })
+      .catch(e => { setLoadError(String(e)); setLoading(false) })
   }, [selectedSiteId, viewDate, capType, productCode, mfgTypeFilter])
 
   const slotsByDate = useMemo(() => {
@@ -301,8 +311,17 @@ export function CapacityCalendarPicker({
             </div>
           ) : !loading && slots.length === 0 ? (
             <div className="py-10 text-center">
-              <p className="text-sm text-[#706E6B] font-medium">No capacity slots found</p>
-              <p className="text-xs text-[#B0AFAD] mt-1">Try clearing the Product or Mfg Type filter, or navigate to a different month</p>
+              {loadError ? (
+                <>
+                  <p className="text-sm text-[#C23934] font-medium">Could not load capacity data</p>
+                  <p className="text-xs text-[#B0AFAD] mt-1 font-mono max-w-xs mx-auto break-words">{loadError}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-[#706E6B] font-medium">No capacity slots found</p>
+                  <p className="text-xs text-[#B0AFAD] mt-1">Try clearing the Product or Mfg Type filter, or navigate to a different month</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-7 gap-1 pb-1">

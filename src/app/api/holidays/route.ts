@@ -14,9 +14,9 @@ export async function GET(req: NextRequest) {
   if (active === 'true') where.active = true
   if (active === 'false') where.active = false
   if (dateFrom || dateTo) {
-    const dateFilter: Record<string, string> = {}
-    if (dateFrom) dateFilter.gte = dateFrom
-    if (dateTo) dateFilter.lte = dateTo
+    const dateFilter: Record<string, Date> = {}
+    if (dateFrom) dateFilter.gte = new Date(dateFrom + 'T00:00:00.000Z')
+    if (dateTo)   dateFilter.lte = new Date(dateTo   + 'T23:59:59.999Z')
     where.date = dateFilter
   }
 
